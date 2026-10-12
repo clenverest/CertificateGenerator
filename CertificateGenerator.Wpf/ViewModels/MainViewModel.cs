@@ -1,6 +1,7 @@
 using CertificateGenerator.Core.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 
 namespace CertificateGenerator.Wpf.ViewModels;
 
@@ -28,13 +29,37 @@ public partial class MainViewModel : ObservableObject
     private bool _isBusy;
 
     /// <summary>
+    /// Путь к выбранному файлу. <c>null</c>, если файл ещё не выбран.
+    /// </summary>
+    [ObservableProperty]
+    private string? _selectedFilePath;
+
+    /// <summary>
     /// Команда «Открыть файл». Пока ничего не делает —
     /// логика появится на следующих шагах.
     /// </summary>
     [RelayCommand]
     private void OpenFile()
     {
-        // TODO: шаг 7 — диалог выбора файла.
-        // TODO: шаг 8 — чтение через ITableReaderResolver и установка TableData.
+        var dialog = new OpenFileDialog
+        {
+            Title = "Выберите файл с таблицей",
+            Filter = "Excel и CSV (*.xlsx;*.csv)|*.xlsx;*.csv|Все файлы (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(dialog.FileName))
+        {
+            return;
+        }
+
+        SelectedFilePath = dialog.FileName;
+        ErrorMessage = null;
     }
 }

@@ -19,26 +19,31 @@
         </Grid.RowDefinitions>
 
         <!-- Панель инструментов -->
-        <StackPanel Grid.Row="0"
-                    Orientation="Horizontal"
-                    Margin="0,0,0,12">
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
 
-            <Button Content="Открыть файл"
-                    Command="{Binding OpenFileCommand}"
-                    Background="#0078D4"
-                    Foreground="White"
-                    Padding="16,8"
-                    FontSize="14"
-                    BorderThickness="0"
-                    Cursor="Hand" />
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Открыть файл"
+                        Command="{Binding OpenFileCommand}"
+                        Background="#0078D4"
+                        Foreground="White"
+                        Padding="16,8"
+                        FontSize="14"
+                        BorderThickness="0"
+                        Cursor="Hand" />
 
-            <ProgressBar Grid.Row="0"
-                         IsIndeterminate="True"
-                         Width="120"
-                         Height="4"
-                         Margin="12,0,0,0"
-                         VerticalAlignment="Center"
-                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                <ProgressBar IsIndeterminate="True"
+                            Width="120"
+                            Height="4"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding SelectedFilePath}"
+                    Foreground="#605E5C"
+                    FontSize="12"
+                    Margin="0,8,0,0"
+                    TextTrimming="CharacterEllipsis" />
         </StackPanel>
 
         <!-- Сообщение об ошибке -->
