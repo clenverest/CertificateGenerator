@@ -1,0 +1,108 @@
+<Window x:Class="CertificateGenerator.Wpf.Views.CreateProjectDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Новый проект"
+        Height="260"
+        Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Расположение -->
+        <TextBlock Grid.Row="0"
+                   Text="Расположение"
+                   FontSize="13"
+                   Foreground="#605E5C"
+                   Margin="0,0,0,4" />
+
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="FolderPathBox"
+                     Grid.Column="0"
+                     Padding="8,6"
+                     FontSize="14"
+                     IsReadOnly="True"
+                     Background="#F3F3F3" />
+
+            <Button Grid.Column="1"
+                    Content="Обзор..."
+                    Click="OnBrowseClick"
+                    Padding="12,6"
+                    Margin="8,0,0,0"
+                    Background="#F3F3F3"
+                    BorderThickness="0"
+                    Cursor="Hand" />
+        </Grid>
+
+        <!-- Имя проекта -->
+        <TextBlock Grid.Row="2"
+                   Text="Имя проекта"
+                   FontSize="13"
+                   Foreground="#605E5C"
+                   Margin="0,0,0,4" />
+
+        <TextBox x:Name="ProjectNameBox"
+                 Grid.Row="3"
+                 Padding="8,6"
+                 FontSize="14"
+                 TextChanged="OnProjectNameChanged" />
+
+        <!-- Плашка ошибки -->
+        <Border Grid.Row="4"
+                x:Name="ErrorPanel"
+                Background="#FDE7E9"
+                BorderBrush="#C42B1C"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="10,6"
+                Margin="0,12,0,0"
+                VerticalAlignment="Top"
+                Visibility="Collapsed">
+
+            <TextBlock x:Name="ErrorText"
+                       Foreground="#C42B1C"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Кнопки -->
+        <StackPanel Grid.Row="5"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0">
+
+            <Button Content="Отмена"
+                    Click="OnCancelClick"
+                    Padding="16,8"
+                    Background="#F3F3F3"
+                    BorderThickness="0"
+                    Cursor="Hand"
+                    IsCancel="True" />
+
+            <Button x:Name="CreateButton"
+                    Content="Создать"
+                    Click="OnCreateClick"
+                    Padding="16,8"
+                    Margin="8,0,0,0"
+                    Background="#0078D4"
+                    Foreground="White"
+                    BorderThickness="0"
+                    Cursor="Hand"
+                    IsDefault="True" />
+        </StackPanel>
+    </Grid>
+</Window>

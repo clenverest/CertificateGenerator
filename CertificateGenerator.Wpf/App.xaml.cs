@@ -1,13 +1,71 @@
-﻿using System.Configuration;
-using System.Data;
-using System.Windows;
+﻿using System.Windows;
+using System.Windows.Threading;
+using CertificateGenerator.Core.Interfaces;
+using CertificateGenerator.Infrastructure.Storage;
+using Microsoft.Extensions.DependencyInjection;
+using CertificateGenerator.Wpf.Services;
+using CertificateGenerator.Wpf.ViewModels;
 
 namespace CertificateGenerator.Wpf;
 
 /// <summary>
-/// Interaction logic for App.xaml
+/// Точка входа приложения. Собирает DI-контейнер и запускает стартовое окно.
 /// </summary>
 public partial class App : Application
 {
-}
+    private readonly ServiceProvider _serviceProvider;
 
+    public App()
+    {
+        var services = new ServiceCollection();
+        ConfigureServices(services);
+        _serviceProvider = services.BuildServiceProvider();
+
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+    }
+
+    /// <summary>
+    /// Регистрация всех зависимостей приложения.
+    /// </summary>
+    private static void ConfigureServices(IServiceCollection services)
+    {
+        // Инфраструктура.
+        services.AddSingleton<IProjectStorage, JsonProjectStorage>();
+        services.AddSingleton<IRecentProjectsStore, JsonRecentProjectsStore>();
+
+        // Wpf-сервисы.
+        services.AddSingleton<IFolderPicker, WpfFolderPicker>();
+
+        // ViewModels.
+        services.AddSingleton<ProjectViewModel>();
+
+        services.AddSingleton<IFolderPicker, WpfFolderPicker>();
+        services.AddSingleton<ICreateProjectDialogService, CreateProjectDialogService>();
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        var startupWindow = new StartupWindow(
+            _serviceProvider.GetRequiredService<ProjectViewModel>());
+        startupWindow.Show();
+    }
+
+    /// <summary>
+    /// Глобальный обработчик необработанных исключений UI-потока.
+    /// Показывает сообщение и не даёт приложению молча упасть.
+    /// </summary>
+    private void OnDispatcherUnhandledException(
+        object sender,
+        DispatcherUnhandledExceptionEventArgs e)
+    {
+        MessageBox.Show(
+            $"Произошла непредвиденная ошибка:\n\n{e.Exception.Message}",
+            "Ошибка",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+
+        e.Handled = true;
+    }
+}
