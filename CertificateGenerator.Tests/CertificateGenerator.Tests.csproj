@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CertificateGenerator.Core\CertificateGenerator.Core.csproj" />
     <ProjectReference Include="..\CertificateGenerator.Infrastructure\CertificateGenerator.Infrastructure.csproj" />
+    <ProjectReference Include="..\CertificateGenerator.Wpf\CertificateGenerator.Wpf.csproj" />
   </ItemGroup>
 
 </Project>

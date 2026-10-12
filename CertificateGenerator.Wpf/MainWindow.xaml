@@ -56,7 +56,8 @@
                    Visibility="{Binding ErrorMessage, Converter={StaticResource BoolToVisibility}}" />
 
         <!-- Таблица -->
-        <DataGrid Grid.Row="2"
+        <DataGrid x:Name="ParticipantsGrid"
+                  Grid.Row="2"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   CanUserAddRows="False"
