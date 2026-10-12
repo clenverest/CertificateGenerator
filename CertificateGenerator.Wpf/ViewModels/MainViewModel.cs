@@ -47,9 +47,23 @@ public partial class MainViewModel : ObservableObject
     private string? _selectedFilePath;
 
     /// <summary>
+    /// Признак наличия ошибки. Используется для видимости плашки с ошибкой.
+    /// </summary>
+    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    /// <summary>
+    /// Краткая сводка по загруженной таблице.
+    /// <c>null</c>, если таблица не загружена.
+    /// </summary>
+    public string? TableSummary =>
+        TableData is null
+            ? null
+            : $"Загружено: {TableData.RowCount} × {TableData.ColumnCount}";
+
+    /// <summary>
     /// Команда «Открыть файл»: открывает диалог выбора и загружает таблицу.
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanOpenFile))]
     private void OpenFile()
     {
         var dialog = new OpenFileDialog
@@ -73,6 +87,12 @@ public partial class MainViewModel : ObservableObject
         SelectedFilePath = dialog.FileName;
         LoadTable(dialog.FileName);
     }
+
+    /// <summary>
+    /// Проверяет, доступна ли команда «Открыть файл».
+    /// Заблокирована, пока идёт загрузка.
+    /// </summary>
+    private bool CanOpenFile() => !IsBusy;
 
     /// <summary>
     /// Загружает таблицу из указанного файла.
@@ -113,5 +133,23 @@ public partial class MainViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    partial void OnErrorMessageChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasError));
+    }
+
+    public bool HasTableSummary => TableData is not null;
+
+    partial void OnTableDataChanged(TableData? value)
+    {
+        OnPropertyChanged(nameof(TableSummary));
+        OnPropertyChanged(nameof(HasTableSummary));
+    }
+
+    partial void OnIsBusyChanged(bool value)
+    {
+        OpenFileCommand.NotifyCanExecuteChanged();
     }
 }

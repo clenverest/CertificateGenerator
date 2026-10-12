@@ -22,6 +22,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
 
             <StackPanel Orientation="Horizontal">
+
                 <Button Content="Открыть файл"
                         Command="{Binding OpenFileCommand}"
                         Background="#0078D4"
@@ -31,29 +32,53 @@
                         BorderThickness="0"
                         Cursor="Hand" />
 
-                <ProgressBar IsIndeterminate="True"
-                            Width="120"
-                            Height="4"
-                            Margin="12,0,0,0"
+                <StackPanel Orientation="Horizontal"
+                            Margin="16,0,0,0"
                             VerticalAlignment="Center"
-                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Width="120"
+                                 Height="4"
+                                 VerticalAlignment="Center" />
+
+                    <TextBlock Text="Загрузка..."
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="#605E5C"
+                               FontSize="12" />
+                </StackPanel>
             </StackPanel>
 
             <TextBlock Text="{Binding SelectedFilePath}"
-                    Foreground="#605E5C"
-                    FontSize="12"
-                    Margin="0,8,0,0"
-                    TextTrimming="CharacterEllipsis" />
+                       Foreground="#605E5C"
+                       FontSize="12"
+                       Margin="0,8,0,0"
+                       TextTrimming="CharacterEllipsis" />
+
+            <TextBlock Text="{Binding TableSummary}"
+                       Foreground="#107C10"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Margin="0,4,0,0"
+                       Visibility="{Binding TableSummary, Converter={StaticResource BoolToVisibility}}" />
         </StackPanel>
 
-        <!-- Сообщение об ошибке -->
-        <TextBlock Grid.Row="1"
-                   Text="{Binding ErrorMessage}"
-                   Foreground="#C42B1C"
-                   FontSize="13"
-                   Margin="0,0,0,8"
-                   TextWrapping="Wrap"
-                   Visibility="{Binding ErrorMessage, Converter={StaticResource BoolToVisibility}}" />
+        <!-- Плашка ошибки -->
+        <Border Grid.Row="1"
+                Background="#FDE7E9"
+                BorderBrush="#C42B1C"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12,8"
+                Margin="0,0,0,12"
+                Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="#C42B1C"
+                       FontSize="13"
+                       TextWrapping="Wrap" />
+        </Border>
 
         <!-- Таблица -->
         <DataGrid x:Name="ParticipantsGrid"

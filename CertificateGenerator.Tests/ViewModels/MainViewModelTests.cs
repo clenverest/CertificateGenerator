@@ -132,4 +132,89 @@ public class MainViewModelTests
 
         Assert.False(vm.IsBusy);
     }
+
+    [Fact]
+    public void HasError_Is_False_By_Default()
+    {
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
+        var vm = new MainViewModel(resolver);
+
+        Assert.False(vm.HasError);
+    }
+
+    [Fact]
+    public void HasError_Is_True_After_Error()
+    {
+        var resolver = new ThrowingTableReaderResolver(new InvalidDataException("битый"));
+        var vm = new MainViewModel(resolver);
+
+        vm.LoadTable("any.xlsx");
+
+        Assert.True(vm.HasError);
+    }
+
+    [Fact]
+    public void HasError_Is_False_After_Success()
+    {
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
+        var vm = new MainViewModel(resolver);
+
+        vm.LoadTable("any.xlsx");
+
+        Assert.False(vm.HasError);
+    }
+
+    [Fact]
+    public void TableSummary_Is_Null_When_No_Table()
+    {
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
+        var vm = new MainViewModel(resolver);
+
+        Assert.Null(vm.TableSummary);
+    }
+
+    [Fact]
+    public void TableSummary_Is_Not_Null_After_Success()
+    {
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
+        var vm = new MainViewModel(resolver);
+
+        vm.LoadTable("any.xlsx");
+
+        Assert.NotNull(vm.TableSummary);
+        Assert.Contains("Загружено", vm.TableSummary);
+    }
+
+    [Fact]
+    public void TableSummary_Contains_Row_And_Column_Counts()
+    {
+        var table = CreateSampleTable();
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(resolver);
+
+        vm.LoadTable("any.xlsx");
+
+        Assert.Contains(table.RowCount.ToString(), vm.TableSummary);
+        Assert.Contains(table.ColumnCount.ToString(), vm.TableSummary);
+    }
+
+    [Fact]
+    public void HasTableSummary_Is_False_When_No_Table()
+    {
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
+        var vm = new MainViewModel(resolver);
+
+        Assert.False(vm.HasTableSummary);
+    }
+
+    [Fact]
+    public void HasTableSummary_Is_True_After_Success()
+    {
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
+        var vm = new MainViewModel(resolver);
+
+        vm.LoadTable("any.xlsx");
+
+        Assert.True(vm.HasTableSummary);
+    }
 }
