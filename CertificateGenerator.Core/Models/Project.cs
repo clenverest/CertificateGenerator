@@ -18,6 +18,7 @@ public sealed class Project
     /// <summary>
     /// Имя исходного файла таблицы внутри папки source/
     /// (например, "data.xlsx" или "data.csv").
+    /// Пустая строка, если таблица ещё не загружена.
     /// </summary>
     public string SourceFileName { get; }
 
@@ -50,12 +51,6 @@ public sealed class Project
             throw new ArgumentException("Имя проекта не может быть пустым.", nameof(name));
         }
 
-        if (string.IsNullOrWhiteSpace(sourceFileName))
-        {
-            throw new ArgumentException(
-                "Имя исходного файла не может быть пустым.",
-                nameof(sourceFileName));
-        }
 
         if (fields is null)
         {

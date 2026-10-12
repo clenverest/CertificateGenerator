@@ -49,4 +49,16 @@ public sealed class ProjectTests
         Assert.Throws<ArgumentNullException>(() =>
             new Project("Проект", DateTime.Now, "data.xlsx", null!));
     }
+
+    [Fact]
+    public void Constructor_EmptySourceFileName_Succeeds()
+    {
+        var project = new Project(
+            "Проект до загрузки таблицы",
+            new DateTime(2026, 10, 12),
+            string.Empty,
+            Array.Empty<Field>());
+
+        Assert.Equal(string.Empty, project.SourceFileName);
+    }
 }
