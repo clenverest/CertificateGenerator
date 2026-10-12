@@ -52,6 +52,11 @@ public partial class MainViewModel : ObservableObject
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     /// <summary>
+    /// Признак того, что таблица загружена. Используется для видимости сводки.
+    /// </summary>
+    public bool HasTableSummary => TableData is not null;
+
+    /// <summary>
     /// Краткая сводка по загруженной таблице.
     /// <c>null</c>, если таблица не загружена.
     /// </summary>
@@ -139,8 +144,6 @@ public partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasError));
     }
-
-    public bool HasTableSummary => TableData is not null;
 
     partial void OnTableDataChanged(TableData? value)
     {

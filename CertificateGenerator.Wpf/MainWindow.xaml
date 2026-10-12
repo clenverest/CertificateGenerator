@@ -61,7 +61,7 @@
                        FontSize="12"
                        FontWeight="SemiBold"
                        Margin="0,4,0,0"
-                       Visibility="{Binding TableSummary, Converter={StaticResource BoolToVisibility}}" />
+                       Visibility="{Binding HasTableSummary, Converter={StaticResource BoolToVisibility}}" />
         </StackPanel>
 
         <!-- Плашка ошибки -->
