@@ -1,7 +1,9 @@
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
 using CertificateGenerator.Core.Interfaces;
 using CertificateGenerator.Core.Models;
+using CertificateGenerator.Core.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -18,10 +20,6 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IProjectStorage _projectStorage;
     private readonly IWindowNavigator _navigator;
 
-    /// <summary>
-    /// Пока true — изменения в <see cref="Fields"/> игнорируются
-    /// (идёт загрузка полей из проекта, сохранять не нужно).
-    /// </summary>
     private bool _isLoadingFields;
 
     [ObservableProperty]
@@ -47,11 +45,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public FieldsViewModel Fields { get; }
 
+    /// <summary>
+    /// Предпросмотр значений полей для первого участника таблицы.
+    /// </summary>
+    public ObservableCollection<FieldPreviewItem> FieldPreviews { get; } = new();
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool HasSummary => TableData is not null;
 
     public bool HasProject => CurrentProject is not null;
+
+    public bool HasPreviews => FieldPreviews.Count > 0;
 
     public string TableSummary =>
         TableData is null
@@ -75,15 +80,11 @@ public sealed partial class MainViewModel : ObservableObject
         _navigator = navigator;
         Fields = fields;
 
-        // Подписка — до любых изменений Fields,
-        // чтобы не потерять CollectionChanged.
         Fields.Fields.CollectionChanged += OnFieldsCollectionChanged;
     }
 
     /// <summary>
     /// Инициализировать ViewModel для работы с проектом.
-    /// Вызывается сразу после создания.
-    /// Если в проекте уже есть таблица — пытается её загрузить.
     /// </summary>
     public void Initialize(Project project, string projectFolderPath)
     {
@@ -101,6 +102,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         TryLoadExistingTable();
+        UpdateFieldPreviews();
     }
 
     // ---------------------------------------------------------------------
@@ -111,27 +113,23 @@ public sealed partial class MainViewModel : ObservableObject
         object? sender,
         NotifyCollectionChangedEventArgs e)
     {
-        if (_isLoadingFields)
+        if (!_isLoadingFields && CurrentProject is not null && ProjectFolderPath is not null)
         {
-            return;
+            var updated = WithFields(Fields.GetFieldsSnapshot());
+
+            try
+            {
+                _projectStorage.Save(updated, ProjectFolderPath);
+                CurrentProject = updated;
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Не удалось сохранить поля: {ex.Message}";
+            }
         }
 
-        if (CurrentProject is null || ProjectFolderPath is null)
-        {
-            return;
-        }
-
-        var updated = WithFields(Fields.GetFieldsSnapshot());
-
-        try
-        {
-            _projectStorage.Save(updated, ProjectFolderPath);
-            CurrentProject = updated;
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Не удалось сохранить поля: {ex.Message}";
-        }
+        // Превью обновляется в любом случае — даже при загрузке.
+        UpdateFieldPreviews();
     }
 
     /// <summary>
@@ -150,7 +148,33 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // ---------------------------------------------------------------------
-    // LoadTableIntoProjectCommand — загрузка таблицы в проект
+    // Предпросмотр значений полей
+    // ---------------------------------------------------------------------
+
+    private void UpdateFieldPreviews()
+    {
+        FieldPreviews.Clear();
+
+        if (TableData is null || TableData.Rows.Count == 0)
+        {
+            OnPropertyChanged(nameof(HasPreviews));
+            return;
+        }
+
+        var firstRow = TableData.Rows[0];
+        var fields = Fields.GetFieldsSnapshot();
+
+        foreach (var field in fields)
+        {
+            var value = FieldValueResolver.Resolve(field, firstRow);
+            FieldPreviews.Add(new FieldPreviewItem(field.Name, value));
+        }
+
+        OnPropertyChanged(nameof(HasPreviews));
+    }
+
+    // ---------------------------------------------------------------------
+    // LoadTableIntoProjectCommand
     // ---------------------------------------------------------------------
 
     [RelayCommand]
@@ -191,10 +215,6 @@ public sealed partial class MainViewModel : ObservableObject
         LoadTableIntoProjectFromPath(dialog.FileName);
     }
 
-    /// <summary>
-    /// Загрузить таблицу в проект: копирует файл в source/,
-    /// обновляет project.json, читает таблицу.
-    /// </summary>
     internal void LoadTableIntoProjectFromPath(string sourceFilePath)
     {
         if (CurrentProject is null || ProjectFolderPath is null)
@@ -208,14 +228,11 @@ public sealed partial class MainViewModel : ObservableObject
 
         try
         {
-            // 1. Копируем файл в source/ проекта, получаем обновлённый Project.
             var updatedProject = _projectStorage.SetSourceTable(
                 ProjectFolderPath, CurrentProject, sourceFilePath);
 
-            // 2. Обновляем CurrentProject в памяти.
             CurrentProject = updatedProject;
 
-            // 3. Читаем таблицу из source/ проекта.
             var projectTablePath = _projectStorage.GetSourceTablePath(
                 updatedProject, ProjectFolderPath);
 
@@ -262,7 +279,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // ---------------------------------------------------------------------
-    // OpenFileCommand — старая логика с Этапа 1, оставлена для совместимости
+    // OpenFileCommand — старая логика с Этапа 1
     // ---------------------------------------------------------------------
 
     [RelayCommand]
@@ -379,6 +396,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(TableSummary));
 
         Fields.SetColumns(value?.Columns ?? Array.Empty<ColumnInfo>());
+        UpdateFieldPreviews();
     }
 
     partial void OnCurrentProjectChanged(Project? value)

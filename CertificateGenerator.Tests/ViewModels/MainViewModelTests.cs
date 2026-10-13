@@ -286,4 +286,84 @@ public sealed class MainViewModelTests
         Assert.Equal(2, vm.Fields.Columns.Count);
         Assert.True(vm.Fields.HasColumns);
     }
+
+    // ---------------------------------------------------------------------
+    // FieldPreviews
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Initialize_WithoutTable_HasNoPreviews()
+    {
+        var vm = CreateViewModel();
+        var fields = new[] { new Field("Класс", FieldKind.Simple, new[] { 0 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+
+        vm.Initialize(project, @"C:\Projects\A");
+
+        Assert.Empty(vm.FieldPreviews);
+        Assert.False(vm.HasPreviews);
+    }
+
+    [Fact]
+    public void LoadTableIntoProjectFromPath_FillsPreviews()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "Класс") },
+            new[] { (IReadOnlyList<string>)new[] { "5А" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+
+        var fields = new[] { new Field("Класс", FieldKind.Simple, new[] { 0 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Single(vm.FieldPreviews);
+        Assert.Equal("Класс", vm.FieldPreviews[0].FieldName);
+        Assert.Equal("5А", vm.FieldPreviews[0].PreviewValue);
+        Assert.True(vm.HasPreviews);
+    }
+
+    [Fact]
+    public void UpdateFieldPreviews_FullName_JoinsColumns()
+    {
+        var table = new TableData(
+            new[]
+            {
+                new ColumnInfo(0, "Фамилия"),
+                new ColumnInfo(1, "Имя"),
+                new ColumnInfo(2, "Отчество")
+            },
+            new[]
+            {
+                (IReadOnlyList<string>)new[] { "Иванов", "Иван", "Иванович" }
+            });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+
+        var fields = new[] { new Field("ФИО", FieldKind.FullName, new[] { 0, 1, 2 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Single(vm.FieldPreviews);
+        Assert.Equal("ФИО", vm.FieldPreviews[0].FieldName);
+        Assert.Equal("Иванов Иван Иванович", vm.FieldPreviews[0].PreviewValue);
+    }
 }

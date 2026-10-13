@@ -110,7 +110,7 @@
                   BorderBrush="#E0E0E0"
                   BorderThickness="1" />
 
-        <!-- Панель полей проекта -->
+                <!-- Панель полей проекта -->
         <Border Grid.Row="3" Grid.Column="1"
                 Width="300"
                 Margin="12,0,0,0"
@@ -120,9 +120,10 @@
                 Visibility="{Binding HasProject, Converter={StaticResource BoolToVisibility}}">
             <Grid Margin="12">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />  <!-- Заголовок "Поля проекта" -->
+                    <RowDefinition Height="*" />     <!-- Список полей -->
+                    <RowDefinition Height="Auto" />  <!-- Кнопки -->
+                    <RowDefinition Height="Auto" />  <!-- Превью -->
                 </Grid.RowDefinitions>
 
                 <!-- Заголовок -->
@@ -199,6 +200,37 @@
                             BorderThickness="0"
                             Cursor="Hand" />
                 </StackPanel>
+
+                <!-- Предпросмотр для первого участника -->
+                <Border Grid.Row="3"
+                        Margin="0,12,0,0"
+                        Padding="8"
+                        Background="#F8F8F8"
+                        CornerRadius="4"
+                        Visibility="{Binding HasPreviews, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="Предпросмотр (первый участник)"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="#605E5C"
+                                   Margin="0,0,0,6" />
+                        <ItemsControl ItemsSource="{Binding FieldPreviews}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,4">
+                                        <TextBlock Text="{Binding FieldName}"
+                                                   FontSize="11"
+                                                   Foreground="#605E5C" />
+                                        <TextBlock Text="{Binding PreviewValue}"
+                                                   FontSize="13"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="#202020" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
     </Grid>
