@@ -67,7 +67,7 @@
 
 Трёхслойная:
 
-- **Core** — модели, интерфейсы, валидация. Не зависит от WPF и библиотек.
+- **Core** — модели, интерфейсы, валидация, сервисы. Не зависит от WPF и библиотек.
 - **Infrastructure** — реализации (Excel, CSV, PDF, ZIP, хранилище).
 - **WPF** — UI (ViewModels, Views).
 
@@ -76,6 +76,7 @@
 - Модульность
 - Ослабление связей
 - Все зависимости в виде интерфейсов
+- Иммутабельность моделей: изменения — через создание нового экземпляра
 
 ## Текущий статус
 
@@ -93,7 +94,7 @@
 
 **2.1 — хранилище проекта.**
 - `JsonProjectStorage`: `Create` / `Load` / `Save` / `Exists` / `SetSourceTable` / `GetSourceTablePath`.
-- Сериализация через `System.Text.Json` (WriteIndented, UnsafeRelaxedJsonEscaping для кириллицы).
+- Сериализация `System.Text.Json` (WriteIndented, UnsafeRelaxedJsonEscaping, CamelCase).
 - Тесты с `TempFolder`.
 
 **2.2 — стартовый экран, DI, диалоги.**
@@ -101,7 +102,7 @@
 - `RecentProjectsStore` — список последних проектов в `%APPDATA%`.
 - `ProjectViewModel` — создание / открытие проекта, список последних.
 - `StartupWindow` — стартовый экран.
-- `CreateProjectDialog` — свой диалог создания (имя + расположение).
+- `CreateProjectDialog` — свой диалог создания.
 - `IFolderPicker`, `ICreateProjectDialogService` — абстракции.
 
 **2.3 — загрузка таблицы в проект.**
@@ -111,34 +112,67 @@
 - Автозагрузка таблицы из `source/` при открытии проекта.
 - `MainWindow` — шапка проекта, кнопка «Загрузить таблицу в проект».
 
-### 🔄 Этап 2.4 в работе: поля проекта
+**2.4 — модель `Field` и создание полей.**
+- `Field`: `Name`, `Kind` (`Simple` / `FullName` / `Static`), `SourceColumnIndexes`, `StaticValue`, `IsRequired`, `Separator`.
+- `Field.ValidateName` — проверка имени (пустое / дубликат).
+- `FieldsViewModel` — список полей, команды add/edit/delete, автосохранение в `project.json`.
+- `FieldEditDialog` — диалог создания / редактирования (имя, тип, значение для статика, чекбокс «Обязательное поле»).
+- `IFieldEditDialogService` + реализация.
+- Панель полей в `MainWindow` (справа), превью значений для первого участника.
 
-**Цель:** пользователь создаёт список полей (ФИО, Класс, Город, Школа, свои),
-сопоставляет их с колонками таблицы, видит ошибки и предупреждения,
-редактирует данные.
+**2.5 — сопоставление полей с колонками.**
+- `ColumnSuggester` — автоподсказка колонок по имени поля.
+  - `SuggestSimple(fieldName, columns)` — одна колонка по имени поля.
+  - `SuggestFullName(columns)` — либо одна колонка «ФИО», либо три: фамилия, имя, отчество.
+- `FieldEditDialog` — выпадающие списки колонок (`Simple` — один, `FullName` — три).
+- Блокировка «Добавить поле», если таблица не загружена.
 
-**Тест этапа:** исправил ошибку — она исчезла.
+**2.6 — склейка ФИО.**
+- `FieldValueResolver` — вычисление значения поля для строки:
+  - `Simple` — одна ячейка (с `Trim`).
+  - `FullName` — склейка непустых ячеек через `Separator`.
+  - `Static` — `StaticValue`.
+- Превью значений полей для первого участника в панели полей.
 
-#### Подэтапы
+**2.7 — валидация.**
+- `RequiredFieldValidator` — обязательные поля (Error).
+- `DuplicateValidator` — дубликаты (Warning), регистронезависимо, `ё→е`, пропуск пустых и статических.
+- `WhitespaceValidator` — лишние пробелы по краям (Warning), пропуск статических.
+- `ProjectValidator` — агрегатор с `CreateDefault()`.
+- Регистрация `IValidator` в DI (пока не используется в UI).
 
-- **2.4.** Модель `Field` и создание полей. UI: список полей, кнопки
-  «Добавить поле», «Удалить поле», «Редактировать поле».
-- **2.5.** Сопоставление полей с колонками: выпадающие списки, автоподсказка.
-- **2.6.** Поле ФИО: склейка из 1–3 колонок.
-- **2.7.** Валидация: `RequiredFieldValidator`, `DuplicateValidator`,
-  `WhitespaceValidator`.
-- **2.8.** Редактирование: `DataGrid` с редактируемыми ячейками.
-- **2.9.** Экран проверки: подсветка ячеек, сводка.
-- **2.10.** Сохранение / отмена.
-- **2.11.** Приёмка Этапа 2.
+**2.8 — редактирование ячеек.**
+- `CellEditViewModel` — ячейка (`Value`, `OriginalValue`, `IsDirty`, `Reset`, событие `ValueChanged`).
+- `RowEditViewModel` — строка (`Cells`, `IsDirty`, `Reset`, событие `ValueChanged`).
+- `MainViewModel.Rows` — `ObservableCollection<RowEditViewModel>`, `RebuildRows`.
+- `DataGrid` с `IsReadOnly="False"`, `SelectionUnit="Cell"`.
+- Правки хранятся в VM, `TableData` остаётся иммутабельной.
 
-#### Что **не** делаем на Этапе 2
+**2.9 — экран проверки.**
+- `MainViewModel.ValidationIssues` + `RunValidation`.
+- Подписки на `ValueChanged` строк → пересчёт валидации.
+- `ValidationCellViewModel` (`FieldName`, `Value`, `HasError`, `HasWarning`, `IsEmpty`).
+- `ValidationRowViewModel` (`RowIndex`, `DisplayRowNumber`, `Cells`, `HasError`, `HasWarning`).
+- `MainViewModel.ValidationRows` + `ValidationSummary` (`ErrorCount`, `WarningCount`, `HasIssues`).
+- `BuildIssueIndex` — быстрый поиск проблем по `(RowIndex, FieldName)`.
+- `TabControl` в `MainWindow`: вкладка «Данные» + вкладка «Проверка».
+- Подсветка ячеек (`CellStyle` + `DataTrigger`) — красный / жёлтый фон.
+- **Важно:** валидация использует актуальные значения из `Rows` (не из `TableData`), т.к. `TableData` не отражает правки пользователя.
 
-- Шаблон PNG, координаты полей — Этап 3.
-- Генерация PDF — Этап 4.
-- Массовая генерация и ZIP — Этап 5.
-- Google Sheets / Yandex Tables напрямую — Future work.
-- Отправка по email — Future work.
+**2.10 — сохранение / отмена.**
+- `RowOverride` — модель правки строки (`RowIndex`, `Values`).
+- `Project.RowOverrides` — `IReadOnlyList<RowOverride>` (опциональный параметр конструктора).
+- `RowOverrideApplier.Apply(source, overrides)` — наложение правок на `TableData`.
+- `MainViewModel` применяет overrides при загрузке таблицы.
+- `MainViewModel.SaveRowOverride` — сохранение / удаление override при правке ячейки.
+- `ResetChangesCommand` — очистка overrides + перезагрузка таблицы.
+- Кнопка «Отменить изменения» в `MainWindow` (серая, если правок нет).
+- Исходный Excel в `source/` не трогается.
+
+### 🔄 Этап 2.11 — приёмка (в работе)
+
+Прогнать сценарии из README, убедиться, что всё работает сквозным образом.
+Никакого нового кода — только проверка.
 
 ### ⏳ Этап 3. Шаблон и настройка полей
 
@@ -160,66 +194,82 @@
 **Тест:** получил ZIP с 10 грамотами.
 
 ## Структура проекта
-
-```
 CertificateGenerator/
 ├── CertificateGenerator.sln
-├── readme.md
+├── README.md
 ├── .gitignore
 ├── CertificateGenerator.Core/
-│   ├── Models/
-│   │   ├── ColumnInfo.cs ✅
-│   │   ├── TableData.cs ✅
-│   │   ├── Project.cs ✅
-│   │   ├── Field.cs ✅
-│   │   ├── FieldKind.cs ✅
-│   │   ├── ValidationIssue.cs ✅
-│   │   ├── IssueSeverity.cs ✅
-│   │   ├── RecentProject.cs ✅
-│   │   └── CreateProjectResult.cs ✅
-│   ├── Interfaces/
-│   │   ├── ITableReader.cs ✅
-│   │   ├── ITableReaderResolver.cs ✅
-│   │   ├── IProjectStorage.cs ✅
-│   │   ├── IValidator.cs ✅
-│   │   ├── IRecentProjectsStore.cs ✅
-│   │   ├── IFolderPicker.cs ✅
-│   │   ├── ICreateProjectDialogService.cs ✅
-│   │   └── IWindowNavigator.cs ✅
-│   └── Validators/ ⏳ Этап 2.7
+│ ├── Models/
+│ │ ├── ColumnInfo.cs ✅
+│ │ ├── TableData.cs ✅
+│ │ ├── Project.cs ✅
+│ │ ├── Field.cs ✅
+│ │ ├── FieldKind.cs ✅
+│ │ ├── RowOverride.cs ✅
+│ │ ├── ValidationIssue.cs ✅
+│ │ ├── IssueSeverity.cs ✅
+│ │ ├── FieldPreviewItem.cs ✅
+│ │ ├── RecentProject.cs ✅
+│ │ └── CreateProjectResult.cs ✅
+│ ├── Interfaces/
+│ │ ├── ITableReader.cs ✅
+│ │ ├── ITableReaderResolver.cs ✅
+│ │ ├── IProjectStorage.cs ✅
+│ │ ├── IValidator.cs ✅
+│ │ ├── IRecentProjectsStore.cs ✅
+│ │ ├── IFolderPicker.cs ✅
+│ │ ├── ICreateProjectDialogService.cs ✅
+│ │ ├── IFieldEditDialogService.cs ✅
+│ │ └── IWindowNavigator.cs ✅
+│ ├── Services/
+│ │ ├── ColumnSuggester.cs ✅
+│ │ ├── FieldValueResolver.cs ✅
+│ │ └── RowOverrideApplier.cs ✅
+│ └── Validators/
+│ ├── RequiredFieldValidator.cs ✅
+│ ├── DuplicateValidator.cs ✅
+│ ├── WhitespaceValidator.cs ✅
+│ └── ProjectValidator.cs ✅
 ├── CertificateGenerator.Infrastructure/
-│   ├── Readers/
-│   │   ├── ClosedXmlTableReader.cs ✅
-│   │   ├── CsvTableReader.cs ✅
-│   │   └── TableReaderResolver.cs ✅
-│   ├── Storage/
-│   │   ├── JsonProjectStorage.cs ✅
-│   │   └── JsonRecentProjectsStore.cs ✅
-│   ├── Generators/ ⏳ Этапы 4–5
-│   └── ZipPacker.cs ⏳ Этап 5
+│ ├── Readers/
+│ │ ├── ClosedXmlTableReader.cs ✅
+│ │ ├── CsvTableReader.cs ✅
+│ │ └── TableReaderResolver.cs ✅
+│ ├── Storage/
+│ │ ├── JsonProjectStorage.cs ✅
+│ │ └── JsonRecentProjectsStore.cs ✅
+│ ├── Generators/ ⏳ Этапы 4–5
+│ └── ZipPacker.cs ⏳ Этап 5
 ├── CertificateGenerator.Wpf/
-│   ├── Services/
-│   │   ├── WpfFolderPicker.cs ✅
-│   │   ├── CreateProjectDialogService.cs ✅
-│   │   └── WpfWindowNavigator.cs ✅
-│   ├── Views/
-│   │   └── CreateProjectDialog.xaml + .cs ✅
-│   ├── ViewModels/
-│   │   ├── MainViewModel.cs ✅
-│   │   ├── ProjectViewModel.cs ✅
-│   │   └── FieldsViewModel.cs ⏳ Этап 2.4
-│   ├── App.xaml ✅ (без StartupUri)
-│   ├── App.xaml.cs ✅ (DI)
-│   ├── MainWindow.xaml + .cs ✅
-│   └── StartupWindow.xaml + .cs ✅
+│ ├── Services/
+│ │ ├── WpfFolderPicker.cs ✅
+│ │ ├── CreateProjectDialogService.cs ✅
+│ │ ├── FieldEditDialogService.cs ✅
+│ │ └── WpfWindowNavigator.cs ✅
+│ ├── Views/
+│ │ ├── CreateProjectDialog.xaml + .cs ✅
+│ │ └── FieldEditDialog.xaml + .cs ✅
+│ ├── ViewModels/
+│ │ ├── MainViewModel.cs ✅
+│ │ ├── ProjectViewModel.cs ✅
+│ │ ├── FieldsViewModel.cs ✅
+│ │ ├── CellEditViewModel.cs ✅
+│ │ ├── RowEditViewModel.cs ✅
+│ │ ├── ValidationCellViewModel.cs ✅
+│ │ └── ValidationRowViewModel.cs ✅
+│ ├── App.xaml ✅ (без StartupUri)
+│ ├── App.xaml.cs ✅ (DI)
+│ ├── MainWindow.xaml + .cs ✅
+│ └── StartupWindow.xaml + .cs ✅
 └── CertificateGenerator.Tests/
-    ├── Models/ ✅
-    ├── Fakes/ ✅
-    ├── Readers/ ✅
-    ├── Storage/ ✅
-    ├── ViewModels/ ✅
-    └── Validators/ ⏳ Этап 2.7
-```
+├── Models/ ✅
+├── Fakes/ ✅ (FakeProjectStorage, FakeValidator, FakeFieldEditDialogService, ...)
+├── Readers/ ✅
+├── Storage/ ✅
+├── Services/ ✅
+├── Validators/ ✅
+└── ViewModels/ ✅
+
 
 ## Ограничения MVP (Future work)
 
@@ -238,7 +288,7 @@ CertificateGenerator/
 1. Установить .NET 8 SDK.
 2. Клонировать репозиторий.
 3. `dotnet build` — собрать.
-4. `dotnet test` — прогнать тесты (128 зелёных на момент завершения 2.3).
+4. `dotnet test` — прогнать тесты.
 5. `dotnet run --project CertificateGenerator.Wpf` — запустить приложение.
 
 ## Репозиторий
@@ -252,8 +302,8 @@ https://github.com/clenverest/CertificateGenerator
 
 ## Контекст для продолжения в новом чате
 
-**Где мы:** Этапы 1 и 2 (подэтапы 2.0–2.3) завершены.
-Подэтап 2.4 в работе (поля проекта, UI).
+**Где мы:** Этапы 1 и 2 (подэтапы 2.0–2.10) завершены.
+Подэтап 2.11 (приёмка Этапа 2) — в работе. Дальше — Этап 3 (PNG-шаблон).
 
 **Что важно помнить при продолжении:**
 
@@ -265,29 +315,33 @@ https://github.com/clenverest/CertificateGenerator
 - `InternalsVisibleTo("CertificateGenerator.Tests")` в `Wpf.csproj`
   и `Infrastructure.csproj`.
 - Иммутабельность моделей: `TableData`, `ColumnInfo`, `Project`, `Field`,
-  `ValidationIssue`, `RecentProject`, `CreateProjectResult` — `sealed`,
-  свойства только `get`, изменения через создание нового экземпляра.
+  `RowOverride`, `ValidationIssue`, `RecentProject`, `CreateProjectResult` —
+  `sealed`, свойства только `get`, изменения через создание нового экземпляра.
 - DI: `Microsoft.Extensions.DependencyInjection` подключён в `App.xaml.cs`.
-  Все зависимости регистрируются в `ConfigureServices`.
-  **Правило:** новая зависимость в конструкторе DI-создаваемого класса
-  требует регистрации, иначе приложение упадёт на `GetRequiredService`.
-- Диалоги: `Microsoft.Win32.OpenFileDialog` и `OpenFolderDialog` —
-  прямо во ViewModel или в отдельном сервисе (`IFolderPicker`,
-  `ICreateProjectDialogService`).
+  Все зависимости — в `ConfigureServices`. **Новая зависимость в конструкторе
+  DI-создаваемого класса требует регистрации.**
 - Команды: `CommunityToolkit.Mvvm` — `[ObservableProperty]`,
-  `[RelayCommand]`, `partial void On...Changed` для пересчёта
-  вычисляемых свойств.
-- **Важно про `PropertyChanged`:** подписка на `PropertyChanged`
-  в окне **до** того, как ViewModel изменяет свойства. Иначе событие
-  теряется. См. `WpfWindowNavigator.NavigateToMain` — `Initialize`
-  вызывается **после** `new MainWindow(...)`.
+  `[RelayCommand]`, `[RelayCommand(CanExecute = nameof(...))]`,
+  `partial void On...Changed` для пересчёта вычисляемых свойств.
+  **`NotifyCanExecuteChanged()` надо вызывать вручную** при изменении
+  того, от чего зависит `CanExecute`.
+- **Подписки на события — до изменений.** См. `WpfWindowNavigator` и
+  `RebuildRows` (подписка на `RowEditViewModel.ValueChanged` — в момент
+  создания строки, **до** `Rows.Add`).
+- **Иммутабельный `TableData` не отражает правки.** Правки живут в
+  `CellEditViewModel.Value`. **Валидация и превью должны использовать
+  `Rows[i].Cells[j].Value`, а не `TableData.Rows[i][j]`.**
+  См. `BuildCurrentTable` в `MainViewModel`.
+- **UI-правки фиксируются по Enter/Tab/LostFocus**, а не на каждое
+  нажатие клавиши. Значит, `ValueChanged` срабатывает умеренно часто.
+- **`RowOverrides` в `project.json`** — только изменённые строки.
+  При возврате к исходному значению — override удаляется.
+- **Исходный Excel не трогается.** Все правки — в `project.json`.
 - Язык интерфейса: русский. Сообщения об ошибках — на русском.
 - Стиль: Windows 11. Акцент `#0078D4`. Ошибки — `#C42B1C`
-  на фоне `#FDE7E9`. Успех `#107C10`. Вторичный текст `#605E5C`.
+  на фоне `#FDE7E9`. Предупреждения — `#8A6D00` на `#FFF4CE`.
+  Успех `#107C10` на `#E6F4EA`. Вторичный текст `#605E5C`.
 - Проект как папка: `project.json`, `source/`, `template/`, `output/`.
 - `RecentProjectsStore` — в `%APPDATA%\CertificateGenerator\recent.json`.
   Кириллица не экранируется (UnsafeRelaxedJsonEscaping).
 - **Актуальное число тестов — проверяй через `dotnet test`.**
-  Я (ассистент) часто ошибаюсь в подсчётах. Считай «было N, добавили M,
-  стало N+M».
-
