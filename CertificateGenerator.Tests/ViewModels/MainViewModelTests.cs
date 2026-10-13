@@ -24,6 +24,32 @@ public sealed class MainViewModelTests
             validator ?? new FakeValidator());
     }
 
+    private static MainViewModel CreateViewModelWithOverride(
+        TableData table,
+        out FakeProjectStorage storage)
+    {
+        storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project(
+            "A", DateTime.Now, "data.xlsx", Array.Empty<Field>(),
+            rowOverrides: new[]
+            {
+                new RowOverride(0, new[] { "Сидоров" })
+            });
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        return vm;
+    }
+
     [Fact]
     public void Constructor_InitialState_HasNoProject()
     {
@@ -918,5 +944,270 @@ public sealed class MainViewModelTests
         Assert.Equal("5А", vm.ValidationRows[0].Cells[1].Value);
         Assert.Equal("Петров", vm.ValidationRows[1].Cells[0].Value);
         Assert.Equal("6Б", vm.ValidationRows[1].Cells[1].Value);
+    }
+
+        [Fact]
+    public void Initialize_ProjectWithOverrides_AppliesThemToRows()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[]
+            {
+                (IReadOnlyList<string>)new[] { "Иванов" },
+                (IReadOnlyList<string>)new[] { "Петров" }
+            });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project(
+            "A", DateTime.Now, "data.xlsx",
+            Array.Empty<Field>(),
+            rowOverrides: new[]
+            {
+                new RowOverride(0, new[] { "Сидоров" })
+            });
+
+        vm.Initialize(project, @"C:\Projects\A");
+
+        Assert.Equal("Сидоров", vm.Rows[0].Cells[0].Value);
+        Assert.Equal("Петров", vm.Rows[1].Cells[0].Value);
+    }
+
+        [Fact]
+    public void LoadTableIntoProjectFromPath_AppliesOverridesFromProject()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project(
+            "A", DateTime.Now, string.Empty,
+            Array.Empty<Field>(),
+            rowOverrides: new[]
+            {
+                new RowOverride(0, new[] { "Сидоров" })
+            });
+        vm.Initialize(project, @"C:\Projects\A");
+
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Single(vm.Rows);
+        Assert.Equal("Сидоров", vm.Rows[0].Cells[0].Value);
+    }
+
+    // ---------------------------------------------------------------------
+    // SaveRowOverride
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void EditCell_SavesOverrideToProject()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        vm.Rows[0].Cells[0].Value = "Петров";
+
+        // Override сохранён в CurrentProject.
+        Assert.Single(vm.CurrentProject!.RowOverrides);
+        Assert.Equal(0, vm.CurrentProject.RowOverrides[0].RowIndex);
+        Assert.Equal("Петров", vm.CurrentProject.RowOverrides[0].Values[0]);
+    }
+
+    [Fact]
+    public void EditCell_SavesToStorage()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        var savesBefore = storage.SaveCalls.Count;
+        vm.Rows[0].Cells[0].Value = "Петров";
+
+        // Было как минимум два Save (при инициализации и загрузке таблицы),
+        // стало — минимум на один больше.
+        Assert.True(storage.SaveCalls.Count > savesBefore);
+    }
+
+    [Fact]
+    public void EditCellBackToOriginal_RemovesOverride()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        vm.Rows[0].Cells[0].Value = "Петров";   // override появился
+        Assert.Single(vm.CurrentProject!.RowOverrides);
+
+        vm.Rows[0].Cells[0].Value = "Иванов";   // вернули исходное
+
+        Assert.Empty(vm.CurrentProject!.RowOverrides);
+    }
+
+    [Fact]
+    public void EditSecondRow_AddsTwoOverrides()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[]
+            {
+                (IReadOnlyList<string>)new[] { "Иванов" },
+                (IReadOnlyList<string>)new[] { "Петров" }
+            });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        vm.Rows[0].Cells[0].Value = "Сидоров";
+        vm.Rows[1].Cells[0].Value = "Кузнецов";
+
+        Assert.Equal(2, vm.CurrentProject!.RowOverrides.Count);
+    }
+
+    [Fact]
+    public void EditCellTwice_ReplacesOverrideNotDuplicates()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        vm.Rows[0].Cells[0].Value = "Петров";
+        vm.Rows[0].Cells[0].Value = "Сидоров";
+
+        Assert.Single(vm.CurrentProject!.RowOverrides);
+        Assert.Equal("Сидоров", vm.CurrentProject.RowOverrides[0].Values[0]);
+    }
+
+    [Fact]
+    public void ResetChanges_WithoutOverrides_CannotExecute()
+    {
+        var vm = CreateViewModel();
+
+        Assert.False(vm.ResetChangesCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ResetChanges_WithOverrides_CanExecute()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var vm = CreateViewModelWithOverride(table, out _);
+
+        Assert.True(vm.ResetChangesCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void EditCell_ThenResetChangesCommandBecomesAvailable()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
+
+        var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.False(vm.ResetChangesCommand.CanExecute(null));
+
+        vm.Rows[0].Cells[0].Value = "Петров";
+
+        Assert.True(vm.ResetChangesCommand.CanExecute(null));
     }
 }

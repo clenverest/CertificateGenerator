@@ -28,6 +28,11 @@ public sealed class Project
     public IReadOnlyList<Field> Fields { get; }
 
     /// <summary>
+    /// Правки строк таблицы. Пустой список, если правок нет.
+    /// </summary>
+    public IReadOnlyList<RowOverride> RowOverrides { get; }
+
+    /// <summary>
     /// Создать проект.
     /// </summary>
     /// <param name="name">Имя проекта.</param>
@@ -35,6 +40,8 @@ public sealed class Project
     /// <param name="sourceFileName">Имя исходного файла таблицы.
     /// Может быть пустой строкой, если таблица ещё не загружена.</param>
     /// <param name="fields">Список полей. Может быть пустым.</param>
+    /// <param name="rowOverrides">Правки строк. Может быть <c>null</c> —
+    /// тогда считается, что правок нет.</param>
     /// <exception cref="ArgumentException">
     /// Бросается, если имя проекта пусто.
     /// </exception>
@@ -46,7 +53,8 @@ public sealed class Project
         string name,
         DateTime createdAt,
         string sourceFileName,
-        IReadOnlyList<Field> fields)
+        IReadOnlyList<Field> fields,
+        IReadOnlyList<RowOverride>? rowOverrides = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -67,5 +75,6 @@ public sealed class Project
         CreatedAt = createdAt;
         SourceFileName = sourceFileName;
         Fields = fields;
+        RowOverrides = rowOverrides?.ToArray() ?? Array.Empty<RowOverride>();    
     }
 }

@@ -48,6 +48,15 @@
                         BorderThickness="0"
                         Cursor="Hand" />
 
+                <Button Content="Отменить изменения"
+                        Command="{Binding ResetChangesCommand}"
+                        Margin="8,0,0,0"
+                        Padding="16,8"
+                        FontSize="14"
+                        Background="#F3F3F3"
+                        BorderThickness="0"
+                        Cursor="Hand" />
+
                 <StackPanel Orientation="Horizontal"
                             Margin="16,0,0,0"
                             VerticalAlignment="Center"

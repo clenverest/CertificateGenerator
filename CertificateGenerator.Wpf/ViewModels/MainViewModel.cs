@@ -382,9 +382,87 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Сохранить (или удалить) override для строки.
+    /// Если строка грязная — сохраняем текущие значения.
+    /// Если чистая — удаляем override (пользователь вернул исходные данные).
+    /// </summary>
+    private void SaveRowOverride(RowEditViewModel row)
+    {
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            return;
+        }
+
+        var overrides = CurrentProject.RowOverrides.ToList();
+        var existingIndex = overrides.FindIndex(o => o.RowIndex == row.RowIndex);
+
+        if (row.IsDirty)
+        {
+            // Собираем значения всех ячеек.
+            var values = row.Cells.Select(c => c.Value).ToList();
+            var newOverride = new RowOverride(row.RowIndex, values);
+
+            if (existingIndex >= 0)
+            {
+                overrides[existingIndex] = newOverride;
+            }
+            else
+            {
+                overrides.Add(newOverride);
+            }
+        }
+        else
+        {
+            // Строка чистая — удаляем override, если был.
+            if (existingIndex >= 0)
+            {
+                overrides.RemoveAt(existingIndex);
+            }
+            else
+            {
+                // Нечего удалять — выходим без сохранения.
+                return;
+            }
+        }
+
+        // Создаём новый Project с обновлёнными RowOverrides.
+        var updated = WithRowOverrides(overrides);
+
+        try
+        {
+            _projectStorage.Save(updated, ProjectFolderPath);
+            CurrentProject = updated;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Не удалось сохранить правку: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Создать копию <see cref="CurrentProject"/> с новым списком правок.
+    /// </summary>
+    private Project WithRowOverrides(IReadOnlyList<RowOverride> rowOverrides)
+    {
+        var project = CurrentProject
+            ?? throw new InvalidOperationException("Проект не открыт.");
+
+        return new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            project.Fields,
+            rowOverrides);
+    }
+
     private void OnRowValueChanged(object? sender, EventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine("=== OnRowValueChanged вызван ===");
+        if (sender is RowEditViewModel row)
+        {
+            SaveRowOverride(row);
+        }
+
         RunValidation();
     }
 
@@ -430,6 +508,60 @@ public sealed partial class MainViewModel : ObservableObject
         LoadTableIntoProjectFromPath(dialog.FileName);
     }
 
+    /// <summary>
+    /// Отменить все правки таблицы и вернуться к исходным данным из source/.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanResetChanges))]
+    private void ResetChanges()
+    {
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            ErrorMessage = "Проект не открыт.";
+            return;
+        }
+
+        if (CurrentProject.RowOverrides.Count == 0)
+        {
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            "Отменить все изменения таблицы? Действие необратимо.",
+            "Отмена изменений",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        // 1. Очищаем RowOverrides и сохраняем.
+        var cleared = WithRowOverrides(Array.Empty<RowOverride>());
+
+        try
+        {
+            _projectStorage.Save(cleared, ProjectFolderPath);
+            CurrentProject = cleared;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Не удалось сохранить отмену: {ex.Message}";
+            return;
+        }
+
+        // 2. Перечитываем исходную таблицу — без правок.
+        ReloadTableFromSource();
+    }
+
+    /// <summary>
+    /// Доступна ли команда: только если есть правки.
+    /// </summary>
+    private bool CanResetChanges()
+    {
+        return CurrentProject is not null && CurrentProject.RowOverrides.Count > 0;
+    }
+
     internal void LoadTableIntoProjectFromPath(string sourceFilePath)
     {
         if (CurrentProject is null || ProjectFolderPath is null)
@@ -459,7 +591,10 @@ public sealed partial class MainViewModel : ObservableObject
             }
 
             var reader = _tableReaderResolver.Resolve(projectTablePath);
-            TableData = reader.Read(projectTablePath);
+            var rawTable = reader.Read(projectTablePath);
+
+            // Применить сохранённые правки строк, если они есть.
+            TableData = RowOverrideApplier.Apply(rawTable, updatedProject.RowOverrides);
             SelectedFilePath = projectTablePath;
         }
         catch (NotSupportedException ex)
@@ -582,7 +717,9 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             var reader = _tableReaderResolver.Resolve(projectTablePath);
-            TableData = reader.Read(projectTablePath);
+            var rawTable = reader.Read(projectTablePath);
+
+            TableData = RowOverrideApplier.Apply(rawTable, CurrentProject.RowOverrides);
             SelectedFilePath = projectTablePath;
         }
         catch (Exception ex)
@@ -593,6 +730,41 @@ public sealed partial class MainViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Перечитать исходную таблицу из source/ и применить текущие правки.
+    /// Используется при отмене изменений.
+    /// </summary>
+    private void ReloadTableFromSource()
+    {
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            return;
+        }
+
+        var projectTablePath = _projectStorage.GetSourceTablePath(
+            CurrentProject, ProjectFolderPath);
+
+        if (projectTablePath is null)
+        {
+            TableData = null;
+            return;
+        }
+
+        try
+        {
+            var reader = _tableReaderResolver.Resolve(projectTablePath);
+            var rawTable = reader.Read(projectTablePath);
+
+            TableData = RowOverrideApplier.Apply(rawTable, CurrentProject.RowOverrides);
+            SelectedFilePath = projectTablePath;
+            ErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Не удалось перезагрузить таблицу: {ex.Message}";
         }
     }
 
@@ -620,6 +792,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasProject));
         OnPropertyChanged(nameof(ProjectName));
+        ResetChangesCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnProjectFolderPathChanged(string? value)

@@ -117,4 +117,62 @@ public sealed class ProjectTests
 
         Assert.Equal(2, project.Fields.Count);
     }
+
+    // ---------------------------------------------------------------------
+    // RowOverrides
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Create_WithoutRowOverrides_EmptyList()
+    {
+        var project = new Project("Проект", DateTime.Now, "", Array.Empty<Field>());
+
+        Assert.Empty(project.RowOverrides);
+    }
+
+    [Fact]
+    public void Create_WithNullRowOverrides_EmptyList()
+    {
+        var project = new Project(
+            "Проект", DateTime.Now, "", Array.Empty<Field>(),
+            rowOverrides: null);
+
+        Assert.Empty(project.RowOverrides);
+    }
+
+    [Fact]
+    public void Create_WithRowOverrides_StoresThem()
+    {
+        var overrides = new[]
+        {
+            new RowOverride(0, new[] { "Иванов", "Иван" }),
+            new RowOverride(2, new[] { "Петров", "Пётр" })
+        };
+
+        var project = new Project(
+            "Проект", DateTime.Now, "", Array.Empty<Field>(),
+            rowOverrides: overrides);
+
+        Assert.Equal(2, project.RowOverrides.Count);
+        Assert.Equal(0, project.RowOverrides[0].RowIndex);
+        Assert.Equal(2, project.RowOverrides[1].RowIndex);
+    }
+
+    [Fact]
+    public void Create_CopiesRowOverrides()
+    {
+        // Если снаружи изменят список — Project не должен это увидеть.
+        var overrides = new List<RowOverride>
+        {
+            new RowOverride(0, new[] { "Иванов" })
+        };
+
+        var project = new Project(
+            "Проект", DateTime.Now, "", Array.Empty<Field>(),
+            rowOverrides: overrides);
+
+        overrides.Add(new RowOverride(1, new[] { "Петров" }));
+
+        Assert.Single(project.RowOverrides);
+    }
 }

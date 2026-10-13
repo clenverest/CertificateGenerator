@@ -178,11 +178,14 @@ public sealed class JsonProjectStorage : IProjectStorage
         File.Copy(sourceFilePath, destinationPath, overwrite: true);
 
         // Создаём новый Project с обновлённым SourceFileName.
+        // RowOverrides сохраняем — при загрузке новой таблицы они могут быть неактуальны,
+        // но стирать их молча — плохо; пользователь сам решит через «Отменить изменения».
         var updated = new Project(
             project.Name,
             project.CreatedAt,
             fileName,
-            project.Fields);
+            project.Fields,
+            project.RowOverrides);
 
         Save(updated, projectFolderPath);
 

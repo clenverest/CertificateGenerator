@@ -177,8 +177,8 @@ public sealed class JsonProjectStorageFileTests
     }
 
     // -----------------------------------------------------------------
-    // SetSourceTable
-    // -----------------------------------------------------------------
+// SetSourceTable
+// -----------------------------------------------------------------
 
     [Fact]
     public void SetSourceTable_CopiesXlsxFileToSourceFolder()
@@ -282,9 +282,9 @@ public sealed class JsonProjectStorageFileTests
             _storage.SetSourceTable(nonExistentFolder, project, sourceFile));
     }
 
-    // -----------------------------------------------------------------
-    // GetSourceTablePath
-    // -----------------------------------------------------------------
+// -----------------------------------------------------------------
+// GetSourceTablePath
+// -----------------------------------------------------------------
 
     [Fact]
     public void GetSourceTablePath_AfterSetSourceTable_ReturnsPath()
@@ -332,5 +332,143 @@ public sealed class JsonProjectStorageFileTests
         var path = _storage.GetSourceTablePath(projectWithMissingFile, projectFolder);
 
         Assert.Null(path);
+    }
+
+    // -----------------------------------------------------------------
+    // RowOverrides — сериализация через Serialize / Deserialize
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public void Serialize_ProjectWithoutRowOverrides_ContainsEmptyArray()
+    {
+        var project = new Project(
+            "Проект", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+
+        var json = JsonProjectStorage.Serialize(project);
+
+        Assert.Contains("rowOverrides", json);
+        Assert.Contains("[]", json);
+    }
+
+    [Fact]
+    public void Serialize_ProjectWithRowOverrides_ContainsValues()
+    {
+        var overrides = new[]
+        {
+            new RowOverride(0, new[] { "Иванов", "Иван" })
+        };
+        var project = new Project(
+            "Проект", DateTime.Now, "data.xlsx",
+            Array.Empty<Field>(),
+            rowOverrides: overrides);
+
+        var json = JsonProjectStorage.Serialize(project);
+
+        Assert.Contains("rowOverrides", json);
+        Assert.Contains("Иванов", json);
+        Assert.Contains("Иван", json);
+    }
+
+    [Fact]
+    public void Deserialize_ProjectWithRowOverrides_RestoresThem()
+    {
+        var json = """
+        {
+          "name": "Проект",
+          "createdAt": "2026-01-01T00:00:00",
+          "sourceFileName": "data.xlsx",
+          "fields": [],
+          "rowOverrides": [
+            {
+              "rowIndex": 0,
+              "values": ["Иванов", "Иван"]
+            },
+            {
+              "rowIndex": 2,
+              "values": ["Петров", "Пётр"]
+            }
+          ]
+        }
+        """;
+
+        var project = JsonProjectStorage.Deserialize(json);
+
+        Assert.Equal(2, project.RowOverrides.Count);
+        Assert.Equal(0, project.RowOverrides[0].RowIndex);
+        Assert.Equal("Иванов", project.RowOverrides[0].Values[0]);
+        Assert.Equal(2, project.RowOverrides[1].RowIndex);
+    }
+
+    [Fact]
+    public void Deserialize_OldJsonWithoutRowOverrides_ReturnsEmptyList()
+    {
+        // Старый project.json (до 2.10) — без поля rowOverrides.
+        var json = """
+        {
+          "name": "Старый проект",
+          "createdAt": "2026-01-01T00:00:00",
+          "sourceFileName": "data.xlsx",
+          "fields": []
+        }
+        """;
+
+        var project = JsonProjectStorage.Deserialize(json);
+
+        Assert.NotNull(project.RowOverrides);
+        Assert.Empty(project.RowOverrides);
+    }
+
+    // -----------------------------------------------------------------
+    // RowOverrides — round-trip через файл
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public void Save_ProjectWithRowOverrides_ThenLoad_PreservesThem()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = System.IO.Path.Combine(temp.Path, "MyProject");
+        _storage.Create(projectFolder, "Проект");
+
+        var overrides = new[]
+        {
+            new RowOverride(0, new[] { "Иванов", "Иван", "Иванович" }),
+            new RowOverride(3, new[] { "", "Пётр", "" })
+        };
+        var modified = new Project(
+            "Изменённый",
+            new DateTime(2026, 10, 13, 12, 0, 0),
+            "data.xlsx",
+            Array.Empty<Field>(),
+            rowOverrides: overrides);
+
+        _storage.Save(modified, projectFolder);
+        var loaded = _storage.Load(projectFolder);
+
+        Assert.Equal(2, loaded.RowOverrides.Count);
+        Assert.Equal(0, loaded.RowOverrides[0].RowIndex);
+        Assert.Equal("Иванов", loaded.RowOverrides[0].Values[0]);
+        Assert.Equal(3, loaded.RowOverrides[1].RowIndex);
+        Assert.Equal("", loaded.RowOverrides[1].Values[0]);
+        Assert.Equal("Пётр", loaded.RowOverrides[1].Values[1]);
+    }
+
+    [Fact]
+    public void Save_ProjectWithoutRowOverrides_ThenLoad_ReturnsEmptyList()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = System.IO.Path.Combine(temp.Path, "MyProject");
+        _storage.Create(projectFolder, "Проект");
+
+        var modified = new Project(
+            "Изменённый",
+            new DateTime(2026, 10, 13, 12, 0, 0),
+            "data.xlsx",
+            Array.Empty<Field>());
+
+        _storage.Save(modified, projectFolder);
+        var loaded = _storage.Load(projectFolder);
+
+        Assert.NotNull(loaded.RowOverrides);
+        Assert.Empty(loaded.RowOverrides);
     }
 }
