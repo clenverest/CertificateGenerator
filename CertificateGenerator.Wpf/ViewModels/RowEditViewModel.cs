@@ -11,6 +11,11 @@ namespace CertificateGenerator.Wpf.ViewModels;
 public sealed class RowEditViewModel : ObservableObject
 {
     /// <summary>
+    /// Возникает при изменении значения любой ячейки строки.
+    /// </summary>
+    public event EventHandler? ValueChanged;
+
+    /// <summary>
     /// Индекс строки в исходной таблице. Начинается с 0.
     /// </summary>
     public int RowIndex { get; }
@@ -38,11 +43,13 @@ public sealed class RowEditViewModel : ObservableObject
         Cells = new ObservableCollection<CellEditViewModel>(
             values.Select(v => new CellEditViewModel(v)));
 
-        // Подписываемся на изменения каждой ячейки,
-        // чтобы пересчитывать свой IsDirty.
+        // Подписываемся на каждую ячейку:
+        // - IsDirty — для агрегата по строке.
+        // - ValueChanged — для проброса наружу.
         foreach (var cell in Cells)
         {
             cell.PropertyChanged += OnCellPropertyChanged;
+            cell.ValueChanged += OnCellValueChanged;
         }
     }
 
@@ -63,5 +70,10 @@ public sealed class RowEditViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(IsDirty));
         }
+    }
+
+    private void OnCellValueChanged(object? sender, EventArgs e)
+    {
+        ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 }

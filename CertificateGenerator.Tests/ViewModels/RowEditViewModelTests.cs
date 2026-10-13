@@ -144,4 +144,57 @@ public class RowEditViewModelTests
         // Мы не фильтруем по фактическому изменению значения — просто пересчитываем.
         Assert.Equal(1, isDirtyRaises);
     }
+
+    // ---------------------------------------------------------------------
+    // ValueChanged
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void ChangeCellValue_RaisesRowValueChanged()
+    {
+        var row = new RowEditViewModel(0, new[] { "Иванов", "5А" });
+        var raised = 0;
+        row.ValueChanged += (_, _) => raised++;
+
+        row.Cells[0].Value = "Петров";
+
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void ChangeDifferentCells_RaisesForEach()
+    {
+        var row = new RowEditViewModel(0, new[] { "Иванов", "5А" });
+        var raised = 0;
+        row.ValueChanged += (_, _) => raised++;
+
+        row.Cells[0].Value = "Петров";
+        row.Cells[1].Value = "6Б";
+
+        Assert.Equal(2, raised);
+    }
+
+    [Fact]
+    public void SetSameCellValue_DoesNotRaise()
+    {
+        var row = new RowEditViewModel(0, new[] { "Иванов", "5А" });
+        var raised = 0;
+        row.ValueChanged += (_, _) => raised++;
+
+        row.Cells[0].Value = "Иванов";   // то же самое
+
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
+    public void Sender_IsRowViewModel()
+    {
+        var row = new RowEditViewModel(0, new[] { "Иванов" });
+        object? capturedSender = null;
+        row.ValueChanged += (s, _) => capturedSender = s;
+
+        row.Cells[0].Value = "Петров";
+
+        Assert.Same(row, capturedSender);
+    }
 }

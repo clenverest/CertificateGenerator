@@ -9,6 +9,12 @@ namespace CertificateGenerator.Wpf.ViewModels;
 public sealed partial class CellEditViewModel : ObservableObject
 {
     /// <summary>
+    /// Возникает при изменении <see cref="Value"/>.
+    /// Используется для пересчёта валидации и подсветки.
+    /// </summary>
+    public event EventHandler? ValueChanged;
+
+    /// <summary>
     /// Исходное значение ячейки. Не меняется в течение сессии редактирования.
     /// </summary>
     public string OriginalValue { get; }
@@ -45,6 +51,10 @@ public sealed partial class CellEditViewModel : ObservableObject
 
     partial void OnValueChanged(string value)
     {
+        System.Diagnostics.Debug.WriteLine($"=== CellEditViewModel.OnValueChanged: '{value}' ===");
+
+
         OnPropertyChanged(nameof(IsDirty));
+        ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 }

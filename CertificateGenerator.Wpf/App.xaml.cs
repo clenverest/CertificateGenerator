@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using CertificateGenerator.Wpf.Services;
 using CertificateGenerator.Wpf.ViewModels;
 using CertificateGenerator.Infrastructure.Readers;
+using CertificateGenerator.Core.Validators;
 
 namespace CertificateGenerator.Wpf;
 
@@ -34,6 +35,9 @@ public partial class App : Application
         services.AddSingleton<IProjectStorage, JsonProjectStorage>();
         services.AddSingleton<IRecentProjectsStore, JsonRecentProjectsStore>();
         services.AddSingleton<ITableReaderResolver, TableReaderResolver>();
+
+        // Валидация.
+        services.AddSingleton<IValidator>(ProjectValidator.CreateDefault());
 
         // Wpf-сервисы.
         services.AddSingleton<IFolderPicker, WpfFolderPicker>();

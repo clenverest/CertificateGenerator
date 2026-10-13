@@ -70,6 +70,8 @@ public partial class FieldEditDialog : Window
             _ => 0
         };
 
+        IsRequiredBox.IsChecked = field.IsRequired;
+
         if (field.Kind == FieldKind.Static)
         {
             StaticValueBox.Text = field.StaticValue ?? string.Empty;
@@ -197,6 +199,11 @@ public partial class FieldEditDialog : Window
         UpdateSaveButtonState();
     }
 
+    private void OnIsRequiredChanged(object sender, RoutedEventArgs e)
+    {
+        UpdateSaveButtonState();
+    }
+
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
@@ -261,6 +268,7 @@ public partial class FieldEditDialog : Window
 
         var kind = GetSelectedKind();
         var trimmedName = NameBox.Text.Trim();
+        var isRequired = IsRequiredBox.IsChecked == true;
 
         if (kind == FieldKind.Static)
         {
@@ -274,6 +282,7 @@ public partial class FieldEditDialog : Window
                 trimmedName,
                 FieldKind.Static,
                 Array.Empty<int>(),
+                isRequired: isRequired,
                 staticValue: StaticValueBox.Text.Trim());
             return true;
         }
@@ -287,7 +296,11 @@ public partial class FieldEditDialog : Window
                 return false;
             }
 
-            field = new Field(trimmedName, FieldKind.Simple, new[] { index.Value });
+            field = new Field(
+                trimmedName,
+                FieldKind.Simple,
+                new[] { index.Value },
+                isRequired: isRequired);
             return true;
         }
 
@@ -314,7 +327,11 @@ public partial class FieldEditDialog : Window
             indexes.Add(idx3.Value);
         }
 
-        field = new Field(trimmedName, FieldKind.FullName, indexes);
+        field = new Field(
+            trimmedName,
+            FieldKind.FullName,
+            indexes,
+            isRequired: isRequired);
         return true;
     }
 

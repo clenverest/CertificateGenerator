@@ -1,6 +1,7 @@
 using CertificateGenerator.Core.Models;
 using CertificateGenerator.Tests.Fakes;
 using CertificateGenerator.Wpf.ViewModels;
+using CertificateGenerator.Core.Validators;
 
 namespace CertificateGenerator.Tests.ViewModels;
 
@@ -13,13 +14,14 @@ public sealed class MainViewModelTests
             Array.Empty<IReadOnlyList<string>>());
     }
 
-    private static MainViewModel CreateViewModel()
+    private static MainViewModel CreateViewModel(FakeValidator? validator = null)
     {
         return new MainViewModel(
             new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
             new FakeProjectStorage(),
             new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator ?? new FakeValidator());
     }
 
     [Fact]
@@ -64,7 +66,10 @@ public sealed class MainViewModelTests
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(), new FieldsViewModel(new FakeFieldEditDialogService()));
+            resolver, storage, 
+            new FakeWindowNavigator(), 
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -83,7 +88,10 @@ public sealed class MainViewModelTests
         var storage = new FakeProjectStorage();
         var resolver = new FakeTableReaderResolver(new FakeTableReader(EmptyTable()));
         var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(), new FieldsViewModel(new FakeFieldEditDialogService()));
+            resolver, storage, 
+            new FakeWindowNavigator(), 
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         // Не вызываем Initialize — CurrentProject остаётся null.
         vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
@@ -102,7 +110,10 @@ public sealed class MainViewModelTests
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(EmptyTable()));
         var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(), new FieldsViewModel(new FakeFieldEditDialogService()));
+            resolver, storage, 
+            new FakeWindowNavigator(), 
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -126,7 +137,10 @@ public sealed class MainViewModelTests
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(), new FieldsViewModel(new FakeFieldEditDialogService()));
+            resolver, storage, 
+            new FakeWindowNavigator(), 
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -166,7 +180,8 @@ public sealed class MainViewModelTests
             new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
             storage,
             new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var fields = new[] { new Field("Класс", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -190,7 +205,8 @@ public sealed class MainViewModelTests
             new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
             storage,
             new FakeWindowNavigator(),
-            new FieldsViewModel(dialog));
+            new FieldsViewModel(dialog),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -216,7 +232,8 @@ public sealed class MainViewModelTests
             new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
             storage,
             new FakeWindowNavigator(),
-            new FieldsViewModel(dialog));
+            new FieldsViewModel(dialog),
+            new FakeValidator());
 
         var createdAt = new DateTime(2026, 1, 1);
         var project = new Project("A", createdAt, "data.xlsx", Array.Empty<Field>());
@@ -248,7 +265,8 @@ public sealed class MainViewModelTests
             new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
             storage,
             new FakeWindowNavigator(),
-            new FieldsViewModel(dialog));
+            new FieldsViewModel(dialog),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -276,7 +294,8 @@ public sealed class MainViewModelTests
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
             resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -318,7 +337,8 @@ public sealed class MainViewModelTests
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
             resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var fields = new[] { new Field("Класс", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -354,7 +374,8 @@ public sealed class MainViewModelTests
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
             resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var fields = new[] { new Field("ФИО", FieldKind.FullName, new[] { 0, 1, 2 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -400,7 +421,8 @@ public sealed class MainViewModelTests
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
             resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -429,7 +451,8 @@ public sealed class MainViewModelTests
         var resolver = new FakeTableReaderResolver(new FakeTableReader(firstTable));
         var vm = new MainViewModel(
             resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -449,7 +472,8 @@ public sealed class MainViewModelTests
         var resolver2 = new FakeTableReaderResolver(new FakeTableReader(secondTable));
         var vm2 = new MainViewModel(
             resolver2, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
         vm2.Initialize(project, @"C:\Projects\A");
         vm2.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
 
@@ -472,7 +496,8 @@ public sealed class MainViewModelTests
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
             resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -495,7 +520,8 @@ public sealed class MainViewModelTests
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var vm = new MainViewModel(
             resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()));
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            new FakeValidator());
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -504,5 +530,393 @@ public sealed class MainViewModelTests
         vm.Rows[0].Cells[0].Value = "Петров";
 
         Assert.True(vm.Rows[0].IsDirty);
+    }
+
+        // ---------------------------------------------------------------------
+    // Валидация
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Initialize_WithoutTable_ValidationIssuesEmpty()
+    {
+        var vm = CreateViewModel();
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+
+        vm.Initialize(project, @"C:\Projects\A");
+
+        Assert.Empty(vm.ValidationIssues);
+    }
+
+    [Fact]
+    public void LoadTable_RunsValidation()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var validator = new FakeValidator
+        {
+            IssuesToReturn = new[]
+            {
+                new ValidationIssue(IssueSeverity.Error, 0, "ФИО", "test")
+            }
+        };
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Single(vm.ValidationIssues);
+        Assert.Equal("ФИО", vm.ValidationIssues[0].FieldName);
+    }
+
+    [Fact]
+    public void AddField_RunsValidation()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var validator = new FakeValidator();
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var dialog = new FakeFieldEditDialogService
+        {
+            FieldToReturnOnCreate = new Field("ФИО", FieldKind.Simple, new[] { 0 })
+        };
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(dialog),
+            validator);
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+        vm.Fields.SetColumns(new[] { new ColumnInfo(0, "ФИО") });
+
+        var callsBefore = validator.Calls.Count;
+        vm.Fields.AddFieldCommand.Execute(null);
+
+        // Валидация запускалась ещё раз после добавления поля.
+        Assert.True(validator.Calls.Count > callsBefore);
+    }
+
+    [Fact]
+    public void EditCell_RunsValidation()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var validator = new FakeValidator();
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        var callsBefore = validator.Calls.Count;
+        vm.Rows[0].Cells[0].Value = "Петров";
+
+        Assert.True(validator.Calls.Count > callsBefore);
+    }
+
+    [Fact]
+    public void EditCellBackToOriginal_StillRunsValidation()
+    {
+        // Даже если значение вернулось к исходному — валидация пересчитывается.
+        // (Оптимизация «не пересчитывать, если ничего не изменилось» — отдельная задача.)
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var validator = new FakeValidator();
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        vm.Rows[0].Cells[0].Value = "Петров";   // изменение
+        var callsAfterFirstChange = validator.Calls.Count;
+
+        vm.Rows[0].Cells[0].Value = "Иванов";   // назад
+
+        Assert.True(validator.Calls.Count > callsAfterFirstChange);
+    }
+
+    // ---------------------------------------------------------------------
+    // ValidationRows + ValidationSummary
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Initialize_WithoutTable_ValidationRowsEmpty()
+    {
+        var vm = CreateViewModel();
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+
+        vm.Initialize(project, @"C:\Projects\A");
+
+        Assert.Empty(vm.ValidationRows);
+        Assert.Equal(0, vm.ErrorCount);
+        Assert.Equal(0, vm.WarningCount);
+        Assert.False(vm.HasIssues);
+        Assert.Equal(string.Empty, vm.ValidationSummary);
+    }
+
+    [Fact]
+    public void LoadTable_NoIssues_ValidationRowsFilled()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[]
+            {
+                (IReadOnlyList<string>)new[] { "Иванов" },
+                (IReadOnlyList<string>)new[] { "Петров" }
+            });
+
+        var validator = new FakeValidator();   // нет проблем
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var dialog = new FakeFieldEditDialogService();
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(dialog),
+            validator);
+
+        // Поле добавляем через LoadFields — иначе диалог вернёт null.
+        var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal(2, vm.ValidationRows.Count);
+        Assert.Single(vm.ValidationRows[0].Cells);
+        Assert.Equal("Иванов", vm.ValidationRows[0].Cells[0].Value);
+        Assert.False(vm.ValidationRows[0].Cells[0].HasError);
+        Assert.Equal("✓ Проблем не найдено", vm.ValidationSummary);
+    }
+
+    [Fact]
+    public void LoadTable_WithErrors_ValidationRowsHaveErrors()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var validator = new FakeValidator
+        {
+            IssuesToReturn = new[]
+            {
+                new ValidationIssue(IssueSeverity.Error, 0, "ФИО", "Обязательно")
+            }
+        };
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Single(vm.ValidationRows);
+        Assert.True(vm.ValidationRows[0].Cells[0].HasError);
+        Assert.Equal(1, vm.ErrorCount);
+        Assert.Equal(0, vm.WarningCount);
+        Assert.Equal("Ошибок: 1", vm.ValidationSummary);
+    }
+
+    [Fact]
+    public void LoadTable_WithWarning_SummaryShowsWarning()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var validator = new FakeValidator
+        {
+            IssuesToReturn = new[]
+            {
+                new ValidationIssue(IssueSeverity.Warning, 0, "ФИО", "Дубликат")
+            }
+        };
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.True(vm.ValidationRows[0].Cells[0].HasWarning);
+        Assert.Equal(0, vm.ErrorCount);
+        Assert.Equal(1, vm.WarningCount);
+        Assert.Equal("Предупреждений: 1", vm.ValidationSummary);
+    }
+
+    [Fact]
+    public void LoadTable_WithBothErrorAndWarning_CellHasBoth()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "  Иванов  " } });
+
+        var validator = new FakeValidator
+        {
+            IssuesToReturn = new[]
+            {
+                new ValidationIssue(IssueSeverity.Error, 0, "ФИО", "Ошибка"),
+                new ValidationIssue(IssueSeverity.Warning, 0, "ФИО", "Пробелы")
+            }
+        };
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        var cell = vm.ValidationRows[0].Cells[0];
+        Assert.True(cell.HasError);
+        Assert.True(cell.HasWarning);
+        Assert.Equal("Ошибок: 1 · Предупреждений: 1", vm.ValidationSummary);
+    }
+
+    [Fact]
+    public void ValidationSummary_ChangesWhenIssuesChange()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var validator = new FakeValidator
+        {
+            IssuesToReturn = new[]
+            {
+                new ValidationIssue(IssueSeverity.Error, 0, "ФИО", "test")
+            }
+        };
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal("Ошибок: 1", vm.ValidationSummary);
+
+        // Меняем fake — теперь проблем нет.
+        validator.IssuesToReturn = Array.Empty<ValidationIssue>();
+
+        // Правка ячейки триггерит RunValidation.
+        vm.Rows[0].Cells[0].Value = "Петров";
+
+        Assert.Equal("✓ Проблем не найдено", vm.ValidationSummary);
+    }
+
+    [Fact]
+    public void ValidationRows_TwoFieldsTwoRows_BuildsCorrectly()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО"), new ColumnInfo(1, "Класс") },
+            new[]
+            {
+                (IReadOnlyList<string>)new[] { "Иванов", "5А" },
+                (IReadOnlyList<string>)new[] { "Петров", "6Б" }
+            });
+
+        var validator = new FakeValidator();
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator);
+
+        var fields = new[]
+        {
+            new Field("ФИО", FieldKind.Simple, new[] { 0 }),
+            new Field("Класс", FieldKind.Simple, new[] { 1 })
+        };
+        var project = new Project("A", DateTime.Now, string.Empty, fields);
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal(2, vm.ValidationRows.Count);
+        Assert.Equal(2, vm.ValidationRows[0].Cells.Count);
+        Assert.Equal("Иванов", vm.ValidationRows[0].Cells[0].Value);
+        Assert.Equal("5А", vm.ValidationRows[0].Cells[1].Value);
+        Assert.Equal("Петров", vm.ValidationRows[1].Cells[0].Value);
+        Assert.Equal("6Б", vm.ValidationRows[1].Cells[1].Value);
     }
 }

@@ -112,4 +112,71 @@ public class CellEditViewModelTests
 
         Assert.Empty(changedProperties);
     }
+
+        // ---------------------------------------------------------------------
+    // ValueChanged
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void ChangeValue_RaisesValueChanged()
+    {
+        var cell = new CellEditViewModel("Иванов");
+        var raised = 0;
+        cell.ValueChanged += (_, _) => raised++;
+
+        cell.Value = "Петров";
+
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void SetSameValue_DoesNotRaiseValueChanged()
+    {
+        var cell = new CellEditViewModel("Иванов");
+        var raised = 0;
+        cell.ValueChanged += (_, _) => raised++;
+
+        cell.Value = "Иванов";   // то же самое
+
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
+    public void ChangeValueTwice_RaisesTwice()
+    {
+        var cell = new CellEditViewModel("Иванов");
+        var raised = 0;
+        cell.ValueChanged += (_, _) => raised++;
+
+        cell.Value = "Петров";
+        cell.Value = "Сидоров";
+
+        Assert.Equal(2, raised);
+    }
+
+    [Fact]
+    public void Reset_WhenDirty_RaisesValueChanged()
+    {
+        var cell = new CellEditViewModel("Иванов");
+        cell.Value = "Петров";
+
+        var raised = 0;
+        cell.ValueChanged += (_, _) => raised++;
+
+        cell.Reset();
+
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void Reset_WhenClean_DoesNotRaiseValueChanged()
+    {
+        var cell = new CellEditViewModel("Иванов");
+        var raised = 0;
+        cell.ValueChanged += (_, _) => raised++;
+
+        cell.Reset();
+
+        Assert.Equal(0, raised);
+    }
 }

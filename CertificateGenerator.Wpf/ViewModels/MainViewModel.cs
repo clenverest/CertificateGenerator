@@ -19,6 +19,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ITableReaderResolver _tableReaderResolver;
     private readonly IProjectStorage _projectStorage;
     private readonly IWindowNavigator _navigator;
+    private readonly IValidator _validator;
 
     private bool _isLoadingFields;
 
@@ -40,6 +41,10 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string? _projectFolderPath;
 
+    [ObservableProperty]
+    private IReadOnlyList<ValidationIssue> _validationIssues =
+        Array.Empty<ValidationIssue>();
+
     /// <summary>
     /// ViewModel для работы со списком полей проекта.
     /// </summary>
@@ -56,9 +61,62 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<RowEditViewModel> Rows { get; } = new();
 
+    /// <summary>
+    /// Строки для таблицы проверки. Заполняются в <see cref="RunValidation"/>.
+    /// </summary>
+    public ObservableCollection<ValidationRowViewModel> ValidationRows { get; } = new();
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool HasSummary => TableData is not null;
+
+    /// <summary>
+    /// Количество ошибок в текущей валидации.
+    /// </summary>
+    public int ErrorCount =>
+        ValidationIssues.Count(i => i.Severity == IssueSeverity.Error);
+
+    /// <summary>
+    /// Количество предупреждений в текущей валидации.
+    /// </summary>
+    public int WarningCount =>
+        ValidationIssues.Count(i => i.Severity == IssueSeverity.Warning);
+
+    /// <summary>
+    /// Текстовая сводка для UI.
+    /// </summary>
+    public string ValidationSummary
+    {
+        get
+        {
+            if (TableData is null)
+            {
+                return string.Empty;
+            }
+
+            if (ErrorCount == 0 && WarningCount == 0)
+            {
+                return "✓ Проблем не найдено";
+            }
+
+            if (ErrorCount == 0)
+            {
+                return $"Предупреждений: {WarningCount}";
+            }
+
+            if (WarningCount == 0)
+            {
+                return $"Ошибок: {ErrorCount}";
+            }
+
+            return $"Ошибок: {ErrorCount} · Предупреждений: {WarningCount}";
+        }
+    }
+
+    /// <summary>
+    /// Есть ли проблемы (ошибки или предупреждения).
+    /// </summary>
+    public bool HasIssues => ErrorCount > 0 || WarningCount > 0;
 
     public bool HasProject => CurrentProject is not null;
 
@@ -79,13 +137,17 @@ public sealed partial class MainViewModel : ObservableObject
         ITableReaderResolver tableReaderResolver,
         IProjectStorage projectStorage,
         IWindowNavigator navigator,
-        FieldsViewModel fields)
+        FieldsViewModel fields,
+        IValidator validator)
     {
         _tableReaderResolver = tableReaderResolver;
         _projectStorage = projectStorage;
         _navigator = navigator;
         Fields = fields;
+        _validator = validator;
 
+        // Подписка — до любых изменений Fields,
+        // чтобы не потерять CollectionChanged.
         Fields.Fields.CollectionChanged += OnFieldsCollectionChanged;
     }
 
@@ -134,8 +196,9 @@ public sealed partial class MainViewModel : ObservableObject
             }
         }
 
-        // Превью обновляется в любом случае — даже при загрузке.
+        // Превью и валидация обновляются в любом случае — даже при загрузке.
         UpdateFieldPreviews();
+        RunValidation();
     }
 
     /// <summary>
@@ -179,12 +242,131 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasPreviews));
     }
 
+    /// <summary>
+    /// Пересчитать валидацию таблицы и полей.
+    /// Результат — в <see cref="ValidationIssues"/>.
+    /// </summary>
+    private void RunValidation()
+    {
+        if (TableData is null || TableData.Rows.Count == 0)
+        {
+            ValidationIssues = Array.Empty<ValidationIssue>();
+            RebuildValidationRows();
+            return;
+        }
+
+        // Собираем актуальную таблицу из VM-строк —
+        // TableData иммутабельная и не отражает правки пользователя.
+        var currentTable = BuildCurrentTable();
+        ValidationIssues = _validator.Validate(currentTable, Fields.GetFieldsSnapshot());
+        RebuildValidationRows();
+    }
+
+    /// <summary>
+    /// Собрать актуальную таблицу из текущих VM-строк (с учётом правок).
+    /// </summary>
+    private TableData BuildCurrentTable()
+    {
+        var rows = new List<IReadOnlyList<string>>(Rows.Count);
+        foreach (var row in Rows)
+        {
+            var cells = new List<string>(row.Cells.Count);
+            foreach (var cell in row.Cells)
+            {
+                cells.Add(cell.Value);
+            }
+            rows.Add(cells);
+        }
+
+        return new TableData(TableData!.Columns, rows);
+    }
+
+    private void RebuildValidationRows()
+    {
+        ValidationRows.Clear();
+
+        if (TableData is null || TableData.Rows.Count == 0)
+        {
+            return;
+        }
+
+        var fields = Fields.GetFieldsSnapshot();
+        if (fields.Count == 0)
+        {
+            return;
+        }
+
+        var issueIndex = BuildIssueIndex(ValidationIssues);
+
+        for (var rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
+        {
+            var rowValues = Rows[rowIndex].Cells.Select(c => c.Value).ToList();
+            var cells = new List<ValidationCellViewModel>(fields.Count);
+
+            foreach (var field in fields)
+            {
+                var value = FieldValueResolver.Resolve(field, rowValues);
+
+                var hasIssue = issueIndex.TryGetValue(
+                    (rowIndex, field.Name),
+                    out var flags);
+
+                var hasError = hasIssue && flags.HasError;
+                var hasWarning = hasIssue && flags.HasWarning;
+
+                cells.Add(new ValidationCellViewModel(
+                    field.Name,
+                    value,
+                    hasError,
+                    hasWarning));
+            }
+
+            ValidationRows.Add(new ValidationRowViewModel(rowIndex, cells));
+        }
+    }
+
+    /// <summary>
+    /// Индекс: для каждой (строка, поле) — есть ли Error и Warning.
+    /// Позволяет за O(1) проверить проблемы для ячейки.
+    /// </summary>
+    private static Dictionary<(int RowIndex, string FieldName), (bool HasError, bool HasWarning)>
+        BuildIssueIndex(IReadOnlyList<ValidationIssue> issues)
+    {
+        var index = new Dictionary<(int, string), (bool HasError, bool HasWarning)>();
+
+        foreach (var issue in issues)
+        {
+            if (issue.RowIndex < 0)
+            {
+                continue;
+            }
+
+            var key = (issue.RowIndex, issue.FieldName);
+
+            // Читаем текущие флаги (или false/false, если записи нет).
+            index.TryGetValue(key, out var flags);
+
+            var hasError = flags.HasError || issue.Severity == IssueSeverity.Error;
+            var hasWarning = flags.HasWarning || issue.Severity == IssueSeverity.Warning;
+
+            index[key] = (hasError, hasWarning);
+        }
+
+        return index;
+    }
+
         /// <summary>
     /// Пересобрать строки редактирования из <see cref="TableData"/>.
     /// Вызывается при смене таблицы.
     /// </summary>
     private void RebuildRows()
     {
+        // Отписываемся от старых строк — иначе утечка.
+        foreach (var row in Rows)
+        {
+            row.ValueChanged -= OnRowValueChanged;
+        }
+
         Rows.Clear();
 
         if (TableData is null)
@@ -194,8 +376,16 @@ public sealed partial class MainViewModel : ObservableObject
 
         for (var i = 0; i < TableData.Rows.Count; i++)
         {
-            Rows.Add(new RowEditViewModel(i, TableData.Rows[i]));
+            var row = new RowEditViewModel(i, TableData.Rows[i]);
+            row.ValueChanged += OnRowValueChanged;
+            Rows.Add(row);
         }
+    }
+
+    private void OnRowValueChanged(object? sender, EventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine("=== OnRowValueChanged вызван ===");
+        RunValidation();
     }
 
     // ---------------------------------------------------------------------
@@ -417,12 +607,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnTableDataChanged(TableData? value)
     {
-         OnPropertyChanged(nameof(HasSummary));
+        OnPropertyChanged(nameof(HasSummary));
         OnPropertyChanged(nameof(TableSummary));
 
         Fields.SetColumns(value?.Columns ?? Array.Empty<ColumnInfo>());
         RebuildRows();
         UpdateFieldPreviews();
+        RunValidation();
     }
 
     partial void OnCurrentProjectChanged(Project? value)
@@ -434,5 +625,13 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnProjectFolderPathChanged(string? value)
     {
         OnPropertyChanged(nameof(ProjectPath));
+    }
+
+    partial void OnValidationIssuesChanged(IReadOnlyList<ValidationIssue> value)
+    {
+        OnPropertyChanged(nameof(ErrorCount));
+        OnPropertyChanged(nameof(WarningCount));
+        OnPropertyChanged(nameof(ValidationSummary));
+        OnPropertyChanged(nameof(HasIssues));
     }
 }

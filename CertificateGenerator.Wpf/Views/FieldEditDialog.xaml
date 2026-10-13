@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Поле"
-        Height="440"
+        Height="480"
         Width="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
@@ -10,17 +10,18 @@
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />  <!-- 0: Имя: подпись -->
-            <RowDefinition Height="Auto" />  <!-- 1: Имя: TextBox -->
-            <RowDefinition Height="Auto" />  <!-- 2: Тип: подпись -->
-            <RowDefinition Height="Auto" />  <!-- 3: Тип: ComboBox -->
-            <RowDefinition Height="Auto" />  <!-- 4: Simple — колонка -->
-            <RowDefinition Height="Auto" />  <!-- 5: FullName — колонка 1 -->
-            <RowDefinition Height="Auto" />  <!-- 6: FullName — колонка 2 -->
-            <RowDefinition Height="Auto" />  <!-- 7: FullName — колонка 3 -->
-            <RowDefinition Height="Auto" />  <!-- 8: Static — значение -->
-            <RowDefinition Height="*" />     <!-- 9: Ошибка -->
-            <RowDefinition Height="Auto" />  <!-- 10: Кнопки -->
+            <RowDefinition Height="Auto" />  <!-- 0:  Имя: подпись -->
+            <RowDefinition Height="Auto" />  <!-- 1:  Имя: TextBox -->
+            <RowDefinition Height="Auto" />  <!-- 2:  Тип: подпись -->
+            <RowDefinition Height="Auto" />  <!-- 3:  Тип: ComboBox -->
+            <RowDefinition Height="Auto" />  <!-- 4:  Обязательное: CheckBox -->
+            <RowDefinition Height="Auto" />  <!-- 5:  Simple — колонка -->
+            <RowDefinition Height="Auto" />  <!-- 6:  FullName — колонка 1 -->
+            <RowDefinition Height="Auto" />  <!-- 7:  FullName — колонка 2 -->
+            <RowDefinition Height="Auto" />  <!-- 8:  FullName — колонка 3 -->
+            <RowDefinition Height="Auto" />  <!-- 9:  Static — значение -->
+            <RowDefinition Height="*" />     <!-- 10: Ошибка -->
+            <RowDefinition Height="Auto" />  <!-- 11: Кнопки -->
         </Grid.RowDefinitions>
 
         <!-- Имя поля -->
@@ -56,9 +57,18 @@
             <ComboBoxItem Content="Статическое" Tag="Static" />
         </ComboBox>
 
+        <!-- Обязательное поле -->
+        <CheckBox x:Name="IsRequiredBox"
+                  Grid.Row="4"
+                  Content="Обязательное поле"
+                  FontSize="13"
+                  Margin="0,0,0,12"
+                  Checked="OnIsRequiredChanged"
+                  Unchecked="OnIsRequiredChanged" />
+
         <!-- Simple: одна колонка -->
         <StackPanel x:Name="SimpleColumnPanel"
-                    Grid.Row="4"
+                    Grid.Row="5"
                     Margin="0,0,0,12"
                     Visibility="Collapsed">
             <TextBlock Text="Колонка-источник"
@@ -75,7 +85,7 @@
 
         <!-- FullName: колонки 1-3 -->
         <StackPanel x:Name="FullNamePanel"
-                    Grid.Row="5"
+                    Grid.Row="6"
                     Grid.RowSpan="3"
                     Visibility="Collapsed">
             <TextBlock Text="Колонка 1 (фамилия)"
@@ -116,7 +126,7 @@
 
         <!-- Static: значение -->
         <StackPanel x:Name="StaticValuePanel"
-                    Grid.Row="8"
+                    Grid.Row="9"
                     Visibility="Collapsed">
             <TextBlock Text="Значение"
                        FontSize="13"
@@ -129,7 +139,7 @@
         </StackPanel>
 
         <!-- Плашка ошибки -->
-        <Border Grid.Row="9"
+        <Border Grid.Row="10"
                 x:Name="ErrorPanel"
                 Background="#FDE7E9"
                 BorderBrush="#C42B1C"
@@ -146,7 +156,7 @@
         </Border>
 
         <!-- Кнопки -->
-        <StackPanel Grid.Row="10"
+        <StackPanel Grid.Row="11"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">
