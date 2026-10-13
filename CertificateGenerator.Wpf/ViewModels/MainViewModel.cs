@@ -4,141 +4,295 @@ using CertificateGenerator.Core.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using System.Windows;
 
 namespace CertificateGenerator.Wpf.ViewModels;
 
 /// <summary>
-/// ViewModel главного экрана.
+/// ViewModel главного окна: работа с проектом и таблицей участников.
 /// </summary>
-public partial class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject
 {
-    private readonly ITableReaderResolver _resolver;
+    private readonly ITableReaderResolver _tableReaderResolver;
+    private readonly IProjectStorage _projectStorage;
+    private readonly IWindowNavigator _navigator;
 
-    /// <summary>
-    /// Создаёт ViewModel с указанным резолвером ридеров.
-    /// </summary>
-    public MainViewModel(ITableReaderResolver resolver)
-    {
-        _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
-    }
-
-    /// <summary>
-    /// Загруженная таблица. <c>null</c>, если файл ещё не загружен.
-    /// </summary>
     [ObservableProperty]
     private TableData? _tableData;
 
-    /// <summary>
-    /// Сообщение об ошибке. <c>null</c> или пусто, если ошибок нет.
-    /// </summary>
     [ObservableProperty]
     private string? _errorMessage;
 
-    /// <summary>
-    /// Признак того, что идёт длительная операция (чтение файла).
-    /// </summary>
     [ObservableProperty]
     private bool _isBusy;
 
-    /// <summary>
-    /// Путь к выбранному файлу. <c>null</c>, если файл ещё не выбран.
-    /// </summary>
     [ObservableProperty]
     private string? _selectedFilePath;
 
-    /// <summary>
-    /// Признак наличия ошибки. Используется для видимости плашки с ошибкой.
-    /// </summary>
+    [ObservableProperty]
+    private Project? _currentProject;
+
+    [ObservableProperty]
+    private string? _projectFolderPath;
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
-    /// <summary>
-    /// Признак того, что таблица загружена. Используется для видимости сводки.
-    /// </summary>
-    public bool HasTableSummary => TableData is not null;
+    public bool HasSummary => TableData is not null;
 
-    /// <summary>
-    /// Краткая сводка по загруженной таблице.
-    /// <c>null</c>, если таблица не загружена.
-    /// </summary>
-    public string? TableSummary =>
+    public bool HasProject => CurrentProject is not null;
+
+    public string TableSummary =>
         TableData is null
-            ? null
-            : $"Загружено: {TableData.RowCount} × {TableData.ColumnCount}";
+            ? string.Empty
+            : $"Загружено: {TableData.Rows.Count} × {TableData.Columns.Count}";
 
-    /// <summary>
-    /// Команда «Открыть файл»: открывает диалог выбора и загружает таблицу.
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanOpenFile))]
-    private void OpenFile()
+    public string ProjectName =>
+        CurrentProject?.Name ?? string.Empty;
+
+    public string ProjectPath =>
+        ProjectFolderPath ?? string.Empty;
+
+    public MainViewModel(
+        ITableReaderResolver tableReaderResolver,
+        IProjectStorage projectStorage,
+        IWindowNavigator navigator)
     {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Выберите файл с таблицей",
-            Filter = "Excel и CSV (*.xlsx;*.csv)|*.xlsx;*.csv|Все файлы (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false,
-        };
-
-        if (dialog.ShowDialog() != true)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(dialog.FileName))
-        {
-            return;
-        }
-
-        SelectedFilePath = dialog.FileName;
-        LoadTable(dialog.FileName);
+        _tableReaderResolver = tableReaderResolver;
+        _projectStorage = projectStorage;
+        _navigator = navigator;
     }
 
     /// <summary>
-    /// Проверяет, доступна ли команда «Открыть файл».
-    /// Заблокирована, пока идёт загрузка.
+    /// Инициализировать ViewModel для работы с проектом.
+    /// Вызывается сразу после создания.
+    /// Если в проекте уже есть таблица — пытается её загрузить.
     /// </summary>
-    private bool CanOpenFile() => !IsBusy;
+    public void Initialize(Project project, string projectFolderPath)
+    {
+        CurrentProject = project;
+        ProjectFolderPath = projectFolderPath;
+
+        TryLoadExistingTable();
+    }
+
+    // ---------------------------------------------------------------------
+    // LoadTableIntoProjectCommand — загрузка таблицы в проект
+    // ---------------------------------------------------------------------
+
+    [RelayCommand]
+    private void LoadTableIntoProject()
+    {
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            ErrorMessage = "Проект не открыт.";
+            return;
+        }
+
+        if (TableData is not null)
+        {
+            var confirm = MessageBox.Show(
+                "В проекте уже загружена таблица. Заменить её?",
+                "Замена таблицы",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+            {
+                return;
+            }
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Выберите файл с участниками",
+            Filter = "Таблицы (*.xlsx;*.csv)|*.xlsx;*.csv"
+        };
+
+        var result = dialog.ShowDialog();
+        if (result != true)
+        {
+            return;
+        }
+
+        LoadTableIntoProjectFromPath(dialog.FileName);
+    }
 
     /// <summary>
-    /// Загружает таблицу из указанного файла.
-    /// Метод <c>internal</c>, чтобы его можно было тестировать без диалога.
+    /// Загрузить таблицу в проект: копирует файл в source/,
+    /// обновляет project.json, читает таблицу.
     /// </summary>
-    internal void LoadTable(string filePath)
+    internal void LoadTableIntoProjectFromPath(string sourceFilePath)
     {
-        IsBusy = true;
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            ErrorMessage = "Проект не открыт.";
+            return;
+        }
+
         ErrorMessage = null;
-        TableData = null;
+        IsBusy = true;
 
         try
         {
-            var reader = _resolver.Resolve(filePath);
-            TableData = reader.Read(filePath);
+            // 1. Копируем файл в source/ проекта, получаем обновлённый Project.
+            var updatedProject = _projectStorage.SetSourceTable(
+                ProjectFolderPath, CurrentProject, sourceFilePath);
+
+            // 2. Обновляем CurrentProject в памяти.
+            CurrentProject = updatedProject;
+
+            // 3. Читаем таблицу из source/ проекта.
+            var projectTablePath = _projectStorage.GetSourceTablePath(
+                updatedProject, ProjectFolderPath);
+
+            if (projectTablePath is null)
+            {
+                ErrorMessage = "Не удалось найти скопированную таблицу.";
+                TableData = null;
+                return;
+            }
+
+            var reader = _tableReaderResolver.Resolve(projectTablePath);
+            TableData = reader.Read(projectTablePath);
+            SelectedFilePath = projectTablePath;
         }
         catch (NotSupportedException ex)
         {
-            ErrorMessage = $"Формат файла не поддерживается: {ex.Message}";
+            ErrorMessage = ex.Message;
+            TableData = null;
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException ex)
         {
-            ErrorMessage = "Файл не найден. Возможно, он был перемещён или удалён.";
+            ErrorMessage = ex.Message;
+            TableData = null;
         }
         catch (InvalidDataException ex)
         {
-            ErrorMessage = $"Файл повреждён или имеет неверный формат: {ex.Message}";
+            ErrorMessage = ex.Message;
+            TableData = null;
         }
         catch (IOException ex)
         {
-            ErrorMessage = $"Не удалось прочитать файл: {ex.Message}";
+            ErrorMessage = ex.Message;
+            TableData = null;
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Непредвиденная ошибка: {ex.Message}";
+            TableData = null;
         }
         finally
         {
             IsBusy = false;
         }
     }
+
+    // ---------------------------------------------------------------------
+    // OpenFileCommand — старая логика с Этапа 1, оставлена для совместимости
+    // ---------------------------------------------------------------------
+
+    [RelayCommand]
+    private void OpenFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Выберите файл с участниками",
+            Filter = "Таблицы (*.xlsx;*.csv)|*.xlsx;*.csv|Все файлы (*.*)|*.*"
+        };
+
+        var result = dialog.ShowDialog();
+        if (result != true)
+        {
+            return;
+        }
+
+        LoadTable(dialog.FileName);
+    }
+
+    internal void LoadTable(string filePath)
+    {
+        ErrorMessage = null;
+        IsBusy = true;
+
+        try
+        {
+            SelectedFilePath = filePath;
+            var reader = _tableReaderResolver.Resolve(filePath);
+            TableData = reader.Read(filePath);
+        }
+        catch (NotSupportedException ex)
+        {
+            ErrorMessage = ex.Message;
+            TableData = null;
+        }
+        catch (FileNotFoundException ex)
+        {
+            ErrorMessage = ex.Message;
+            TableData = null;
+        }
+        catch (InvalidDataException ex)
+        {
+            ErrorMessage = ex.Message;
+            TableData = null;
+        }
+        catch (IOException ex)
+        {
+            ErrorMessage = ex.Message;
+            TableData = null;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Непредвиденная ошибка: {ex.Message}";
+            TableData = null;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Приватные методы
+    // ---------------------------------------------------------------------
+
+    private void TryLoadExistingTable()
+    {
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            return;
+        }
+
+        var projectTablePath = _projectStorage.GetSourceTablePath(
+            CurrentProject, ProjectFolderPath);
+
+        if (projectTablePath is null)
+        {
+            return;
+        }
+
+        ErrorMessage = null;
+        IsBusy = true;
+
+        try
+        {
+            var reader = _tableReaderResolver.Resolve(projectTablePath);
+            TableData = reader.Read(projectTablePath);
+            SelectedFilePath = projectTablePath;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Не удалось загрузить таблицу из проекта: {ex.Message}";
+            TableData = null;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Реакция на изменение свойств
+    // ---------------------------------------------------------------------
 
     partial void OnErrorMessageChanged(string? value)
     {
@@ -147,12 +301,18 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnTableDataChanged(TableData? value)
     {
+        OnPropertyChanged(nameof(HasSummary));
         OnPropertyChanged(nameof(TableSummary));
-        OnPropertyChanged(nameof(HasTableSummary));
     }
 
-    partial void OnIsBusyChanged(bool value)
+    partial void OnCurrentProjectChanged(Project? value)
     {
-        OpenFileCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasProject));
+        OnPropertyChanged(nameof(ProjectName));
+    }
+
+    partial void OnProjectFolderPathChanged(string? value)
+    {
+        OnPropertyChanged(nameof(ProjectPath));
     }
 }

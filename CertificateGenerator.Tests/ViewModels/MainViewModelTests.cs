@@ -1,220 +1,140 @@
-using System.IO;
 using CertificateGenerator.Core.Models;
 using CertificateGenerator.Tests.Fakes;
 using CertificateGenerator.Wpf.ViewModels;
-using Xunit;
 
 namespace CertificateGenerator.Tests.ViewModels;
 
-public class MainViewModelTests
+public sealed class MainViewModelTests
 {
-    private static TableData CreateSampleTable()
+
+    public string? GetSourceTablePathToReturn { get; set; }
+    public Exception? ExceptionToThrowOnSetSourceTable { get; set; }
+
+    private static MainViewModel CreateViewModel()
     {
-        var columns = new List<ColumnInfo>
-        {
-            new ColumnInfo(0, "ФИО"),
-            new ColumnInfo(1, "Класс"),
-        };
-        var rows = new List<IReadOnlyList<string>>
-        {
-            new List<string> { "Иванов Иван", "5А" },
-        };
-        return new TableData(columns, rows);
+        var emptyTable = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            Array.Empty<IReadOnlyList<string>>());
+
+        return new MainViewModel(
+            new FakeTableReaderResolver(new FakeTableReader(emptyTable)),
+            new FakeProjectStorage(),
+            new FakeWindowNavigator());
     }
 
     [Fact]
-    public void Constructor_Throws_On_Null_Resolver()
+    public void Constructor_InitialState_HasNoProject()
     {
-        Assert.Throws<ArgumentNullException>(
-            () => new MainViewModel(null!));
-    }
+        var vm = CreateViewModel();
 
-    [Fact]
-    public void LoadTable_Success_Sets_TableData()
-    {
-        var table = CreateSampleTable();
-        var reader = new FakeTableReader(table);
-        var resolver = new FakeTableReaderResolver(reader);
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-
-        Assert.Same(table, vm.TableData);
-        Assert.Null(vm.ErrorMessage);
-        Assert.False(vm.IsBusy);
-    }
-
-    [Fact]
-    public void LoadTable_Clears_Previous_Error()
-    {
-        var table = CreateSampleTable();
-        var reader = new FakeTableReader(table);
-        var resolver = new FakeTableReaderResolver(reader);
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-        Assert.Null(vm.ErrorMessage);
-
-        vm.LoadTable("any.xlsx");
-        Assert.Null(vm.ErrorMessage);
-    }
-
-    [Fact]
-    public void LoadTable_InvalidData_Sets_ErrorMessage()
-    {
-        var resolver = new ThrowingTableReaderResolver(
-            new InvalidDataException("битый файл"));
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-
+        Assert.Null(vm.CurrentProject);
+        Assert.Null(vm.ProjectFolderPath);
         Assert.Null(vm.TableData);
-        Assert.NotNull(vm.ErrorMessage);
-        Assert.Contains("битый файл", vm.ErrorMessage);
-        Assert.False(vm.IsBusy);
-    }
-
-    [Fact]
-    public void LoadTable_FileNotFound_Sets_ErrorMessage()
-    {
-        var resolver = new ThrowingTableReaderResolver(
-            new FileNotFoundException("нет файла"));
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-
-        Assert.Null(vm.TableData);
-        Assert.NotNull(vm.ErrorMessage);
-        Assert.False(vm.IsBusy);
-    }
-
-    [Fact]
-    public void LoadTable_IOException_Sets_ErrorMessage()
-    {
-        var resolver = new ThrowingTableReaderResolver(
-            new IOException("файл занят"));
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-
-        Assert.Null(vm.TableData);
-        Assert.NotNull(vm.ErrorMessage);
-        Assert.False(vm.IsBusy);
-    }
-
-    [Fact]
-    public void LoadTable_Resets_TableData_On_Error()
-    {
-        var table = CreateSampleTable();
-        var reader = new FakeTableReader(table);
-        var resolver = new FakeTableReaderResolver(reader);
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-        Assert.NotNull(vm.TableData);
-
-        var throwingResolver = new ThrowingTableReaderResolver(
-            new InvalidDataException("битый файл"));
-        var vm2 = new MainViewModel(throwingResolver);
-        vm2.LoadTable("any.xlsx");
-
-        Assert.Null(vm2.TableData);
-    }
-
-    [Fact]
-    public void LoadTable_Resets_IsBusy_On_Error()
-    {
-        var resolver = new ThrowingTableReaderResolver(
-            new InvalidDataException("битый файл"));
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-
-        Assert.False(vm.IsBusy);
-    }
-
-    [Fact]
-    public void HasError_Is_False_By_Default()
-    {
-        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
-        var vm = new MainViewModel(resolver);
-
+        Assert.Null(vm.ErrorMessage);
         Assert.False(vm.HasError);
     }
 
     [Fact]
-    public void HasError_Is_True_After_Error()
+    public void Initialize_SetsProjectAndPath()
     {
-        var resolver = new ThrowingTableReaderResolver(new InvalidDataException("битый"));
-        var vm = new MainViewModel(resolver);
+        var vm = CreateViewModel();
+        var project = new Project(
+            "Осень 2026", DateTime.Now, "data.xlsx", Array.Empty<Field>());
 
-        vm.LoadTable("any.xlsx");
+        vm.Initialize(project, @"C:\Projects\Осень 2026");
 
-        Assert.True(vm.HasError);
+        Assert.NotNull(vm.CurrentProject);
+        Assert.Equal("Осень 2026", vm.CurrentProject!.Name);
+        Assert.Equal(@"C:\Projects\Осень 2026", vm.ProjectFolderPath);
+        Assert.True(vm.HasProject);
+        Assert.Equal("Осень 2026", vm.ProjectName);
+        Assert.Equal(@"C:\Projects\Осень 2026", vm.ProjectPath);
     }
 
     [Fact]
-    public void HasError_Is_False_After_Success()
+    public void LoadTableIntoProjectFromPath_ValidPath_CopiesAndReadsTable()
     {
-        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
-        var vm = new MainViewModel(resolver);
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов Иван" } });
 
-        vm.LoadTable("any.xlsx");
-
-        Assert.False(vm.HasError);
-    }
-
-    [Fact]
-    public void TableSummary_Is_Null_When_No_Table()
-    {
-        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
-        var vm = new MainViewModel(resolver);
-
-        Assert.Null(vm.TableSummary);
-    }
-
-    [Fact]
-    public void TableSummary_Is_Not_Null_After_Success()
-    {
-        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
-        var vm = new MainViewModel(resolver);
-
-        vm.LoadTable("any.xlsx");
-
-        Assert.NotNull(vm.TableSummary);
-        Assert.Contains("Загружено", vm.TableSummary);
-    }
-
-    [Fact]
-    public void TableSummary_Contains_Row_And_Column_Counts()
-    {
-        var table = CreateSampleTable();
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(resolver);
+        var vm = new MainViewModel(resolver, storage, new FakeWindowNavigator());
 
-        vm.LoadTable("any.xlsx");
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
 
-        Assert.Contains(table.RowCount.ToString(), vm.TableSummary);
-        Assert.Contains(table.ColumnCount.ToString(), vm.TableSummary);
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.NotNull(vm.TableData);
+        Assert.Single(vm.TableData!.Rows);
+        Assert.Equal(@"C:\Projects\A\source\data.xlsx", vm.SelectedFilePath);
+        Assert.Null(vm.ErrorMessage);
     }
 
     [Fact]
-    public void HasTableSummary_Is_False_When_No_Table()
+    public void LoadTableIntoProjectFromPath_NoProject_ShowsError()
     {
-        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
-        var vm = new MainViewModel(resolver);
+        var storage = new FakeProjectStorage();
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(
+            new TableData(
+                new[] { new ColumnInfo(0, "ФИО") },
+                Array.Empty<IReadOnlyList<string>>())));
+        var vm = new MainViewModel(resolver, storage, new FakeWindowNavigator());
 
-        Assert.False(vm.HasTableSummary);
+        // Не вызываем Initialize — CurrentProject остаётся null.
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal("Проект не открыт.", vm.ErrorMessage);
+        Assert.Null(vm.TableData);
     }
 
     [Fact]
-    public void HasTableSummary_Is_True_After_Success()
+    public void LoadTableIntoProjectFromPath_StorageThrows_SetsErrorMessage()
     {
-        var resolver = new FakeTableReaderResolver(new FakeTableReader(CreateSampleTable()));
-        var vm = new MainViewModel(resolver);
+        var storage = new FakeProjectStorage
+        {
+            ExceptionToThrowOnSetSourceTable =
+                new IOException("Файл занят другим процессом.")
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(
+            new TableData(
+                new[] { new ColumnInfo(0, "ФИО") },
+                Array.Empty<IReadOnlyList<string>>())));
+        var vm = new MainViewModel(resolver, storage, new FakeWindowNavigator());
 
-        vm.LoadTable("any.xlsx");
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
 
-        Assert.True(vm.HasTableSummary);
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal("Файл занят другим процессом.", vm.ErrorMessage);
+        Assert.Null(vm.TableData);
+    }
+
+    [Fact]
+    public void Initialize_ProjectWithSourceTable_LoadsTable()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Петров Пётр" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(resolver, storage, new FakeWindowNavigator());
+
+        var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+
+        Assert.NotNull(vm.TableData);
+        Assert.Single(vm.TableData!.Rows);
+        Assert.Equal(@"C:\Projects\A\source\data.xlsx", vm.SelectedFilePath);
     }
 }

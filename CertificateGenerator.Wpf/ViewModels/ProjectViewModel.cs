@@ -16,6 +16,7 @@ public sealed partial class ProjectViewModel : ObservableObject
     private readonly IRecentProjectsStore _recentStore;
     private readonly IFolderPicker _folderPicker;
     private readonly ICreateProjectDialogService _createProjectDialog;
+    private readonly IWindowNavigator _navigator;
 
     [ObservableProperty]
     private Project? _currentProject;
@@ -33,12 +34,14 @@ public sealed partial class ProjectViewModel : ObservableObject
         IProjectStorage projectStorage,
         IRecentProjectsStore recentStore,
         IFolderPicker folderPicker,
-        ICreateProjectDialogService createProjectDialog)
+        ICreateProjectDialogService createProjectDialog,
+        IWindowNavigator navigator)
     {
         _projectStorage = projectStorage;
         _recentStore = recentStore;
         _folderPicker = folderPicker;
         _createProjectDialog = createProjectDialog;
+        _navigator = navigator;
         ReloadRecentProjects();
     }
 
@@ -91,6 +94,7 @@ public sealed partial class ProjectViewModel : ObservableObject
     {
         ErrorMessage = null;
 
+        Project? created;
         try
         {
             var projectName = System.IO.Path.GetFileName(
@@ -103,32 +107,39 @@ public sealed partial class ProjectViewModel : ObservableObject
                 projectName = "Новый проект";
             }
 
-            var project = _projectStorage.Create(folderPath, projectName);
-            CurrentProject = project;
-            _recentStore.Add(folderPath, project.Name);
+            created = _projectStorage.Create(folderPath, projectName);
+            CurrentProject = created;
+            _recentStore.Add(folderPath, created.Name);
             ReloadRecentProjects();
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            return;
         }
+
+        _navigator.NavigateToMain(created, folderPath);
     }
 
     internal void OpenProjectAt(string folderPath)
     {
         ErrorMessage = null;
 
+        Project? opened;
         try
         {
-            var project = _projectStorage.Load(folderPath);
-            CurrentProject = project;
-            _recentStore.Add(folderPath, project.Name);
+            opened = _projectStorage.Load(folderPath);
+            CurrentProject = opened;
+            _recentStore.Add(folderPath, opened.Name);
             ReloadRecentProjects();
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            return;
         }
+
+        _navigator.NavigateToMain(opened, folderPath);
     }
 
     // ---------------------------------------------------------------------

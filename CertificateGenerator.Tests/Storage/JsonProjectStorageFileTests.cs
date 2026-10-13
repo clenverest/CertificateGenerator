@@ -175,4 +175,162 @@ public sealed class JsonProjectStorageFileTests
     {
         Assert.False(_storage.Exists(string.Empty));
     }
+
+    // -----------------------------------------------------------------
+    // SetSourceTable
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public void SetSourceTable_CopiesXlsxFileToSourceFolder()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var sourceFile = Path.Combine(temp.Path, "Участники.xlsx");
+        File.WriteAllText(sourceFile, "fake xlsx");
+
+        var updated = _storage.SetSourceTable(projectFolder, project, sourceFile);
+
+        Assert.Equal("Участники.xlsx", updated.SourceFileName);
+        var expectedPath = Path.Combine(projectFolder, "source", "Участники.xlsx");
+        Assert.True(File.Exists(expectedPath));
+    }
+
+    [Fact]
+    public void SetSourceTable_CopiesCsvFile()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var sourceFile = Path.Combine(temp.Path, "Участники.csv");
+        File.WriteAllText(sourceFile, "fake csv");
+
+        var updated = _storage.SetSourceTable(projectFolder, project, sourceFile);
+
+        Assert.Equal("Участники.csv", updated.SourceFileName);
+        var expectedPath = Path.Combine(projectFolder, "source", "Участники.csv");
+        Assert.True(File.Exists(expectedPath));
+    }
+
+    [Fact]
+    public void SetSourceTable_ReplacesOldTable()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var firstFile = Path.Combine(temp.Path, "Первый.xlsx");
+        File.WriteAllText(firstFile, "first");
+        var afterFirst = _storage.SetSourceTable(projectFolder, project, firstFile);
+
+        var secondFile = Path.Combine(temp.Path, "Второй.csv");
+        File.WriteAllText(secondFile, "second");
+        var afterSecond = _storage.SetSourceTable(projectFolder, afterFirst, secondFile);
+
+        Assert.Equal("Второй.csv", afterSecond.SourceFileName);
+
+        var sourceFolder = Path.Combine(projectFolder, "source");
+        var files = Directory.GetFiles(sourceFolder);
+        Assert.Single(files);
+        Assert.EndsWith("Второй.csv", files[0]);
+    }
+
+    [Fact]
+    public void SetSourceTable_UpdatesProjectJson()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var sourceFile = Path.Combine(temp.Path, "Новый.xlsx");
+        File.WriteAllText(sourceFile, "data");
+
+        _storage.SetSourceTable(projectFolder, project, sourceFile);
+        var reloaded = _storage.Load(projectFolder);
+
+        Assert.Equal("Новый.xlsx", reloaded.SourceFileName);
+    }
+
+    [Fact]
+    public void SetSourceTable_SourceFileMissing_ThrowsFileNotFoundException()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var missingFile = Path.Combine(temp.Path, "НетТакого.xlsx");
+
+        Assert.Throws<FileNotFoundException>(() =>
+            _storage.SetSourceTable(projectFolder, project, missingFile));
+    }
+
+    [Fact]
+    public void SetSourceTable_ProjectFolderMissing_ThrowsDirectoryNotFoundException()
+    {
+        using var temp = new TempFolder();
+        var nonExistentFolder = Path.Combine(temp.Path, "НетТакой");
+
+        var sourceFile = Path.Combine(temp.Path, "Файл.xlsx");
+        File.WriteAllText(sourceFile, "data");
+
+        var project = new Project(
+            "Проект", DateTime.Now, string.Empty, Array.Empty<Field>());
+
+        Assert.Throws<DirectoryNotFoundException>(() =>
+            _storage.SetSourceTable(nonExistentFolder, project, sourceFile));
+    }
+
+    // -----------------------------------------------------------------
+    // GetSourceTablePath
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public void GetSourceTablePath_AfterSetSourceTable_ReturnsPath()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var sourceFile = Path.Combine(temp.Path, "Участники.xlsx");
+        File.WriteAllText(sourceFile, "data");
+        var updated = _storage.SetSourceTable(projectFolder, project, sourceFile);
+
+        var path = _storage.GetSourceTablePath(updated, projectFolder);
+
+        Assert.NotNull(path);
+        Assert.True(File.Exists(path));
+        Assert.EndsWith("Участники.xlsx", path);
+    }
+
+    [Fact]
+    public void GetSourceTablePath_NoSourceTable_ReturnsNull()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var path = _storage.GetSourceTablePath(project, projectFolder);
+
+        Assert.Null(path);
+    }
+
+    [Fact]
+    public void GetSourceTablePath_SourceFileNameSetButFileMissing_ReturnsNull()
+    {
+        using var temp = new TempFolder();
+        var projectFolder = Path.Combine(temp.Path, "MyProject");
+        var project = _storage.Create(projectFolder, "Проект");
+
+        var projectWithMissingFile = new Project(
+            project.Name,
+            project.CreatedAt,
+            "Пропавший.xlsx",
+            project.Fields);
+
+        var path = _storage.GetSourceTablePath(projectWithMissingFile, projectFolder);
+
+        Assert.Null(path);
+    }
 }

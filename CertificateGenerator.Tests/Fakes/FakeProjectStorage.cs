@@ -18,6 +18,10 @@ public sealed class FakeProjectStorage : IProjectStorage
     public List<string> LoadedPaths { get; } = new();
     public List<string> CreatedPaths { get; } = new();
 
+    public Exception? ExceptionToThrowOnSetSourceTable { get; set; }
+    public string? GetSourceTablePathToReturn { get; set; }
+    public List<(string ProjectFolderPath, string SourceFilePath)> SetSourceTableCalls { get; } = new();
+
     public Project Create(string projectFolderPath, string projectName)
     {
         CreatedPaths.Add(projectFolderPath);
@@ -48,5 +52,29 @@ public sealed class FakeProjectStorage : IProjectStorage
     public bool Exists(string projectFolderPath)
     {
         return ExistsToReturn;
+    }
+
+    public Project SetSourceTable(
+        string projectFolderPath,
+        Project project,
+        string sourceFilePath)
+    {
+        SetSourceTableCalls.Add((projectFolderPath, sourceFilePath));
+        if (ExceptionToThrowOnSetSourceTable is not null)
+        {
+            throw ExceptionToThrowOnSetSourceTable;
+        }
+
+        var fileName = System.IO.Path.GetFileName(sourceFilePath);
+        return new Project(
+            project.Name,
+            project.CreatedAt,
+            fileName,
+            project.Fields);
+    }
+
+    public string? GetSourceTablePath(Project project, string projectFolderPath)
+    {
+        return GetSourceTablePathToReturn;
     }
 }

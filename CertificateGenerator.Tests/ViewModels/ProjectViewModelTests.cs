@@ -10,15 +10,17 @@ public sealed class ProjectViewModelTests
                     FakeProjectStorage storage,
                     FakeRecentProjectsStore recentStore,
                     FakeFolderPicker picker,
-                    FakeCreateProjectDialogService createDialog)
+                    FakeCreateProjectDialogService createDialog,
+                    FakeWindowNavigator navigator)
         CreateViewModel()
     {
         var storage = new FakeProjectStorage();
         var recentStore = new FakeRecentProjectsStore();
         var picker = new FakeFolderPicker();
         var createDialog = new FakeCreateProjectDialogService();
-        var vm = new ProjectViewModel(storage, recentStore, picker, createDialog);
-        return (vm, storage, recentStore, picker, createDialog);
+        var navigator = new FakeWindowNavigator();
+        var vm = new ProjectViewModel(storage, recentStore, picker, createDialog, navigator);
+        return (vm, storage, recentStore, picker, createDialog, navigator);
     }
 
     // ---------------------------------------------------------------------
@@ -28,7 +30,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void Constructor_InitialState_HasNoProjectAndNoError()
     {
-        var (vm, _, _, _, _) = CreateViewModel();
+        var (vm, _, _, _, _, _) = CreateViewModel();
 
         Assert.Null(vm.CurrentProject);
         Assert.Null(vm.ErrorMessage);
@@ -44,7 +46,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void CreateProjectAt_ValidPath_SetsCurrentProjectAndAddsToRecent()
     {
-        var (vm, storage, recentStore, _, _) = CreateViewModel();
+        var (vm, storage, recentStore, _, _, _) = CreateViewModel();
         storage.ProjectToReturnOnCreate = new Project(
             "Мой проект", DateTime.Now, string.Empty, Array.Empty<Field>());
 
@@ -62,7 +64,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void CreateProjectAt_FolderNotEmpty_SetsErrorMessage()
     {
-        var (vm, storage, _, _, _) = CreateViewModel();
+        var (vm, storage, _, _, _, _) = CreateViewModel();
         storage.ExceptionToThrowOnCreate = new InvalidOperationException(
             "Папка не пуста.");
 
@@ -81,7 +83,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void OpenProjectAt_ValidPath_SetsCurrentProject()
     {
-        var (vm, storage, _, _, _) = CreateViewModel();
+        var (vm, storage, _, _, _, _) = CreateViewModel();
         storage.ProjectToReturnOnLoad = new Project(
             "Существующий", DateTime.Now, "data.xlsx", Array.Empty<Field>());
 
@@ -96,7 +98,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void OpenProjectAt_ProjectNotFound_SetsErrorMessage()
     {
-        var (vm, storage, _, _, _) = CreateViewModel();
+        var (vm, storage, _, _, _, _) = CreateViewModel();
         storage.ExceptionToThrowOnLoad = new FileNotFoundException(
             "В папке нет файла проекта.");
 
@@ -114,7 +116,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void OpenRecentProjectCommand_NullParameter_DoesNothing()
     {
-        var (vm, storage, _, _, _) = CreateViewModel();
+        var (vm, storage, _, _, _, _) = CreateViewModel();
 
         vm.OpenRecentProjectCommand.Execute(null);
 
@@ -125,7 +127,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void OpenRecentProjectCommand_ValidEntry_LoadsProject()
     {
-        var (vm, storage, _, _, _) = CreateViewModel();
+        var (vm, storage, _, _, _, _) = CreateViewModel();
         storage.ProjectToReturnOnLoad = new Project(
             "Из списка", DateTime.Now, string.Empty, Array.Empty<Field>());
         var recent = new RecentProject(@"C:\Projects\Из списка", "Из списка", DateTime.Now);
@@ -144,7 +146,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void CreateProjectCommand_UserCancels_DoesNothing()
     {
-        var (vm, storage, _, _, createDialog) = CreateViewModel();
+        var (vm, storage, _, _, createDialog, _) = CreateViewModel();
         createDialog.ResultToReturn = null;
 
         vm.CreateProjectCommand.Execute(null);
@@ -158,7 +160,7 @@ public sealed class ProjectViewModelTests
     [Fact]
     public void CreateProjectCommand_UserPicksFolder_CreatesProject()
     {
-        var (vm, storage, _, _, createDialog) = CreateViewModel();
+        var (vm, storage, _, _, createDialog, _) = CreateViewModel();
         createDialog.ResultToReturn = new CreateProjectResult(
             @"C:\Projects", "Новый");
         storage.ProjectToReturnOnCreate = new Project(
@@ -187,10 +189,62 @@ public sealed class ProjectViewModelTests
 
         var vm = new ProjectViewModel(
             storage, recentStore, picker,
-            new FakeCreateProjectDialogService());
+            new FakeCreateProjectDialogService(), 
+            new FakeWindowNavigator());
 
         Assert.Equal(2, vm.RecentProjects.Count);
         Assert.Equal("B", vm.RecentProjects[0].ProjectName);
         Assert.Equal("A", vm.RecentProjects[1].ProjectName);
+    }
+
+    [Fact]
+    public void CreateProjectAt_ValidPath_CallsNavigator()
+    {
+        var (vm, storage, _, _, _, navigator) = CreateViewModel();
+        storage.ProjectToReturnOnCreate = new Project(
+            "Мой проект", DateTime.Now, string.Empty, Array.Empty<Field>());
+
+        vm.CreateProjectAt(@"C:\Projects\Мой проект");
+
+        Assert.Single(navigator.MainNavigations);
+        Assert.Equal(@"C:\Projects\Мой проект", navigator.MainNavigations[0].ProjectFolderPath);
+        Assert.Equal("Мой проект", navigator.MainNavigations[0].Project.Name);
+    }
+
+    [Fact]
+    public void CreateProjectAt_FolderNotEmpty_DoesNotCallNavigator()
+    {
+        var (vm, storage, _, _, _, navigator) = CreateViewModel();
+        storage.ExceptionToThrowOnCreate = new InvalidOperationException("Папка не пуста.");
+
+        vm.CreateProjectAt(@"C:\Projects\Занято");
+
+        Assert.Empty(navigator.MainNavigations);
+        Assert.True(vm.HasError);
+    }
+
+    [Fact]
+    public void OpenProjectAt_ValidPath_CallsNavigator()
+    {
+        var (vm, storage, _, _, _, navigator) = CreateViewModel();
+        storage.ProjectToReturnOnLoad = new Project(
+            "Существующий", DateTime.Now, "data.xlsx", Array.Empty<Field>());
+
+        vm.OpenProjectAt(@"C:\Projects\Существующий");
+
+        Assert.Single(navigator.MainNavigations);
+        Assert.Equal(@"C:\Projects\Существующий", navigator.MainNavigations[0].ProjectFolderPath);
+    }
+
+    [Fact]
+    public void OpenProjectAt_ProjectNotFound_DoesNotCallNavigator()
+    {
+        var (vm, storage, _, _, _, navigator) = CreateViewModel();
+        storage.ExceptionToThrowOnLoad = new FileNotFoundException("Нет файла.");
+
+        vm.OpenProjectAt(@"C:\Projects\Пусто");
+
+        Assert.Empty(navigator.MainNavigations);
+        Assert.True(vm.HasError);
     }
 }

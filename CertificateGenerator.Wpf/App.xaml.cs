@@ -5,6 +5,7 @@ using CertificateGenerator.Infrastructure.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using CertificateGenerator.Wpf.Services;
 using CertificateGenerator.Wpf.ViewModels;
+using CertificateGenerator.Infrastructure.Readers;
 
 namespace CertificateGenerator.Wpf;
 
@@ -32,23 +33,28 @@ public partial class App : Application
         // Инфраструктура.
         services.AddSingleton<IProjectStorage, JsonProjectStorage>();
         services.AddSingleton<IRecentProjectsStore, JsonRecentProjectsStore>();
+        services.AddSingleton<ITableReaderResolver, TableReaderResolver>();
 
         // Wpf-сервисы.
         services.AddSingleton<IFolderPicker, WpfFolderPicker>();
+        services.AddSingleton<ICreateProjectDialogService, CreateProjectDialogService>();
+        services.AddSingleton<IWindowNavigator, WpfWindowNavigator>();
+        
 
         // ViewModels.
-        services.AddSingleton<ProjectViewModel>();
+        services.AddTransient<ProjectViewModel>();
+        services.AddTransient<MainViewModel>();
 
-        services.AddSingleton<IFolderPicker, WpfFolderPicker>();
-        services.AddSingleton<ICreateProjectDialogService, CreateProjectDialogService>();
+        // Окна.
+        services.AddTransient<StartupWindow>();
     }
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        var startupWindow = new StartupWindow(
-            _serviceProvider.GetRequiredService<ProjectViewModel>());
+        var startupWindow = _serviceProvider.GetRequiredService<StartupWindow>();
+        Application.Current.MainWindow = startupWindow;
         startupWindow.Show();
     }
 

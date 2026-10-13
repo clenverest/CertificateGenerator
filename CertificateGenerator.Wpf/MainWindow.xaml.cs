@@ -2,7 +2,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using CertificateGenerator.Infrastructure.Readers;
 using CertificateGenerator.Wpf.ViewModels;
 
 namespace CertificateGenerator.Wpf;
@@ -11,12 +10,11 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
 
-    public MainWindow()
+    public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
 
-        var resolver = new TableReaderResolver();
-        _viewModel = new MainViewModel(resolver);
+        _viewModel = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
     }

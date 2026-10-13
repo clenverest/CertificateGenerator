@@ -126,6 +126,96 @@ public sealed class JsonProjectStorage : IProjectStorage
         return File.Exists(projectFilePath);
     }
 
+    public Project SetSourceTable(
+        string projectFolderPath,
+        Project project,
+        string sourceFilePath)
+    {
+        if (project is null)
+        {
+            throw new ArgumentNullException(nameof(project));
+        }
+
+        if (string.IsNullOrWhiteSpace(projectFolderPath))
+        {
+            throw new ArgumentException(
+                "Путь к папке проекта не может быть пустым.",
+                nameof(projectFolderPath));
+        }
+
+        if (string.IsNullOrWhiteSpace(sourceFilePath))
+        {
+            throw new ArgumentException(
+                "Путь к исходному файлу не может быть пустым.",
+                nameof(sourceFilePath));
+        }
+
+        if (!Directory.Exists(projectFolderPath))
+        {
+            throw new DirectoryNotFoundException(
+                $"Папка проекта \"{projectFolderPath}\" не существует.");
+        }
+
+        if (!File.Exists(sourceFilePath))
+        {
+            throw new FileNotFoundException(
+                $"Исходный файл \"{sourceFilePath}\" не найден.",
+                sourceFilePath);
+        }
+
+        var sourceFolder = Path.Combine(projectFolderPath, SourceFolderName);
+        Directory.CreateDirectory(sourceFolder);
+
+        // Удаляем старую таблицу: любые файлы в source/.
+        foreach (var oldFile in Directory.EnumerateFiles(sourceFolder))
+        {
+            File.Delete(oldFile);
+        }
+
+        // Копируем новый файл. Имя сохраняем — обычно data.xlsx или data.csv.
+        var fileName = Path.GetFileName(sourceFilePath);
+        var destinationPath = Path.Combine(sourceFolder, fileName);
+        File.Copy(sourceFilePath, destinationPath, overwrite: true);
+
+        // Создаём новый Project с обновлённым SourceFileName.
+        var updated = new Project(
+            project.Name,
+            project.CreatedAt,
+            fileName,
+            project.Fields);
+
+        Save(updated, projectFolderPath);
+
+        return updated;
+    }
+
+    public string? GetSourceTablePath(Project project, string projectFolderPath)
+    {
+        if (project is null)
+        {
+            throw new ArgumentNullException(nameof(project));
+        }
+
+        if (string.IsNullOrWhiteSpace(projectFolderPath))
+        {
+            throw new ArgumentException(
+                "Путь к папке проекта не может быть пустым.",
+                nameof(projectFolderPath));
+        }
+
+        if (string.IsNullOrWhiteSpace(project.SourceFileName))
+        {
+            return null;
+        }
+
+        var path = Path.Combine(
+            projectFolderPath,
+            SourceFolderName,
+            project.SourceFileName);
+
+        return File.Exists(path) ? path : null;
+    }
+
     // ---------------------------------------------------------------------
     // Сериализация (internal, тестируется напрямую)
     // ---------------------------------------------------------------------
