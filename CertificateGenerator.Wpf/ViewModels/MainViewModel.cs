@@ -50,6 +50,12 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<FieldPreviewItem> FieldPreviews { get; } = new();
 
+        /// <summary>
+    /// Строки таблицы в режиме редактирования.
+    /// Пересобираются при смене <see cref="TableData"/>.
+    /// </summary>
+    public ObservableCollection<RowEditViewModel> Rows { get; } = new();
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool HasSummary => TableData is not null;
@@ -171,6 +177,25 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(HasPreviews));
+    }
+
+        /// <summary>
+    /// Пересобрать строки редактирования из <see cref="TableData"/>.
+    /// Вызывается при смене таблицы.
+    /// </summary>
+    private void RebuildRows()
+    {
+        Rows.Clear();
+
+        if (TableData is null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < TableData.Rows.Count; i++)
+        {
+            Rows.Add(new RowEditViewModel(i, TableData.Rows[i]));
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -392,10 +417,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnTableDataChanged(TableData? value)
     {
-        OnPropertyChanged(nameof(HasSummary));
+         OnPropertyChanged(nameof(HasSummary));
         OnPropertyChanged(nameof(TableSummary));
 
         Fields.SetColumns(value?.Columns ?? Array.Empty<ColumnInfo>());
+        RebuildRows();
         UpdateFieldPreviews();
     }
 

@@ -366,4 +366,143 @@ public sealed class MainViewModelTests
         Assert.Equal("ФИО", vm.FieldPreviews[0].FieldName);
         Assert.Equal("Иванов Иван Иванович", vm.FieldPreviews[0].PreviewValue);
     }
+
+        // ---------------------------------------------------------------------
+    // Rows (редактируемые строки)
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Initialize_WithoutTable_RowsIsEmpty()
+    {
+        var vm = CreateViewModel();
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+
+        vm.Initialize(project, @"C:\Projects\A");
+
+        Assert.Empty(vm.Rows);
+    }
+
+    [Fact]
+    public void LoadTableIntoProjectFromPath_BuildsRows()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО"), new ColumnInfo(1, "Класс") },
+            new[]
+            {
+                (IReadOnlyList<string>)new[] { "Иванов", "5А" },
+                (IReadOnlyList<string>)new[] { "Петров", "6Б" }
+            });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal(2, vm.Rows.Count);
+        Assert.Equal(0, vm.Rows[0].RowIndex);
+        Assert.Equal(1, vm.Rows[1].RowIndex);
+        Assert.Equal(2, vm.Rows[0].Cells.Count);
+        Assert.Equal("Иванов", vm.Rows[0].Cells[0].Value);
+        Assert.Equal("5А", vm.Rows[0].Cells[1].Value);
+    }
+
+    [Fact]
+    public void LoadNewTable_ReplacesRows()
+    {
+        var firstTable = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(firstTable));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Single(vm.Rows);
+
+        // Теперь загружаем другую таблицу — 3 строки.
+        var secondTable = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[]
+            {
+                (IReadOnlyList<string>)new[] { "Петров" },
+                (IReadOnlyList<string>)new[] { "Сидоров" },
+                (IReadOnlyList<string>)new[] { "Кузнецов" }
+            });
+        var resolver2 = new FakeTableReaderResolver(new FakeTableReader(secondTable));
+        var vm2 = new MainViewModel(
+            resolver2, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+        vm2.Initialize(project, @"C:\Projects\A");
+        vm2.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal(3, vm2.Rows.Count);
+        Assert.Equal("Петров", vm2.Rows[0].Cells[0].Value);
+        Assert.Equal("Кузнецов", vm2.Rows[2].Cells[0].Value);
+    }
+
+    [Fact]
+    public void Rows_AreNotDirtyAfterBuild()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.All(vm.Rows, r => Assert.False(r.IsDirty));
+    }
+
+    [Fact]
+    public void Rows_EditCell_MakesRowDirty()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        vm.Rows[0].Cells[0].Value = "Петров";
+
+        Assert.True(vm.Rows[0].IsDirty);
+    }
 }

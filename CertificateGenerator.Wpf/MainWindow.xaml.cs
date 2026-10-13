@@ -43,11 +43,11 @@ public partial class MainWindow : Window
             var gridColumn = new DataGridTextColumn
             {
                 Header = column.Name,
-                Binding = new Binding($"[{column.Index}]"),
+                Binding = new Binding($"Cells[{column.Index}].Value"),
             };
             ParticipantsGrid.Columns.Add(gridColumn);
         }
 
-        ParticipantsGrid.ItemsSource = table.Rows;
+        ParticipantsGrid.ItemsSource = _viewModel.Rows;
     }
 }
