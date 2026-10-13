@@ -77,4 +77,192 @@ public sealed class FieldTests
         Assert.Throws<ArgumentException>(() =>
             new Field(string.Empty, FieldKind.Simple, new[] { 0 }));
     }
+
+    // ---------------------------------------------------------------------
+    // Simple
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Simple_WithOneColumn_Creates()
+    {
+        var field = new Field("Класс", FieldKind.Simple, new[] { 0 });
+
+        Assert.Equal("Класс", field.Name);
+        Assert.Equal(FieldKind.Simple, field.Kind);
+        Assert.Single(field.SourceColumnIndexes);
+        Assert.Null(field.StaticValue);
+    }
+
+    [Fact]
+    public void Simple_WithTwoColumns_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("Класс", FieldKind.Simple, new[] { 0, 1 }));
+    }
+
+    [Fact]
+    public void Simple_WithZeroColumns_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("Класс", FieldKind.Simple, Array.Empty<int>()));
+    }
+
+    [Fact]
+    public void Simple_WithStaticValue_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("Класс", FieldKind.Simple, new[] { 0 }, staticValue: "5А"));
+    }
+
+    // ---------------------------------------------------------------------
+    // FullName
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void FullName_WithThreeColumns_Creates()
+    {
+        var field = new Field("ФИО", FieldKind.FullName, new[] { 0, 1, 2 });
+
+        Assert.Equal(FieldKind.FullName, field.Kind);
+        Assert.Equal(3, field.SourceColumnIndexes.Count);
+    }
+
+    [Fact]
+    public void FullName_WithOneColumn_Creates()
+    {
+        var field = new Field("ФИО", FieldKind.FullName, new[] { 0 });
+
+        Assert.Single(field.SourceColumnIndexes);
+    }
+
+    [Fact]
+    public void FullName_WithFourColumns_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("ФИО", FieldKind.FullName, new[] { 0, 1, 2, 3 }));
+    }
+
+    [Fact]
+    public void FullName_WithZeroColumns_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("ФИО", FieldKind.FullName, Array.Empty<int>()));
+    }
+
+    // ---------------------------------------------------------------------
+    // Static
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Static_WithValue_Creates()
+    {
+        var field = new Field(
+            "Дата",
+            FieldKind.Static,
+            Array.Empty<int>(),
+            staticValue: "1 сентября 2026");
+
+        Assert.Equal(FieldKind.Static, field.Kind);
+        Assert.Empty(field.SourceColumnIndexes);
+        Assert.Equal("1 сентября 2026", field.StaticValue);
+    }
+
+    [Fact]
+    public void Static_WithColumns_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("Дата", FieldKind.Static, new[] { 0 }, staticValue: "1 сентября"));
+    }
+
+    [Fact]
+    public void Static_WithNullValue_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("Дата", FieldKind.Static, Array.Empty<int>()));
+    }
+
+    [Fact]
+    public void Static_WithWhitespaceValue_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("Дата", FieldKind.Static, Array.Empty<int>(), staticValue: "   "));
+    }
+
+    // ---------------------------------------------------------------------
+    // Общее
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void EmptyName_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("", FieldKind.Simple, new[] { 0 }));
+    }
+
+    [Fact]
+    public void NegativeColumnIndex_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Field("Класс", FieldKind.Simple, new[] { -1 }));
+    }
+
+    // ---------------------------------------------------------------------
+    // ValidateName
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void ValidateName_EmptyName_ReturnsError()
+    {
+        var error = Field.ValidateName("", Array.Empty<string>());
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void ValidateName_WhitespaceName_ReturnsError()
+    {
+        var error = Field.ValidateName("   ", Array.Empty<string>());
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void ValidateName_UniqueName_ReturnsNull()
+    {
+        var error = Field.ValidateName("Класс", new[] { "ФИО", "Школа" });
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void ValidateName_DuplicateName_ReturnsError()
+    {
+        var error = Field.ValidateName("Класс", new[] { "ФИО", "Класс" });
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void ValidateName_DuplicateIgnoringCase_ReturnsError()
+    {
+        var error = Field.ValidateName("класс", new[] { "Класс" });
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void ValidateName_DuplicateIgnoringWhitespace_ReturnsError()
+    {
+        var error = Field.ValidateName("  Класс  ", new[] { "Класс" });
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void ValidateName_NullName_ReturnsError()
+    {
+        var error = Field.ValidateName(null, Array.Empty<string>());
+
+        Assert.NotNull(error);
+    }
 }

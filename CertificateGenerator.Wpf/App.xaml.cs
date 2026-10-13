@@ -39,11 +39,13 @@ public partial class App : Application
         services.AddSingleton<IFolderPicker, WpfFolderPicker>();
         services.AddSingleton<ICreateProjectDialogService, CreateProjectDialogService>();
         services.AddSingleton<IWindowNavigator, WpfWindowNavigator>();
+        services.AddSingleton<IFieldEditDialogService, FieldEditDialogService>();
         
 
         // ViewModels.
         services.AddTransient<ProjectViewModel>();
         services.AddTransient<MainViewModel>();
+        services.AddTransient<FieldsViewModel>();
 
         // Окна.
         services.AddTransient<StartupWindow>();

@@ -61,4 +61,60 @@ public sealed class ProjectTests
 
         Assert.Equal(string.Empty, project.SourceFileName);
     }
+
+    [Fact]
+    public void Create_WithValidData_Succeeds()
+    {
+        var project = new Project(
+            "Олимпиада 2026",
+            new DateTime(2026, 1, 1),
+            "",
+            Array.Empty<Field>());
+
+        Assert.Equal("Олимпиада 2026", project.Name);
+        Assert.Equal("", project.SourceFileName);
+        Assert.Empty(project.Fields);
+    }
+
+    [Fact]
+    public void Create_WithNullSourceFileName_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new Project("Проект", DateTime.Now, null!, Array.Empty<Field>()));
+    }
+
+    [Fact]
+    public void Create_WithNullFields_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new Project("Проект", DateTime.Now, "", null!));
+    }
+
+    [Fact]
+    public void Create_WithEmptyName_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Project("", DateTime.Now, "", Array.Empty<Field>()));
+    }
+
+    [Fact]
+    public void Create_WithWhitespaceName_Throws()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new Project("   ", DateTime.Now, "", Array.Empty<Field>()));
+    }
+
+    [Fact]
+    public void Create_WithFields_StoresThem()
+    {
+        var fields = new[]
+        {
+            new Field("Класс", FieldKind.Simple, new[] { 0 }),
+            new Field("ФИО", FieldKind.FullName, new[] { 1, 2 })
+        };
+
+        var project = new Project("Проект", DateTime.Now, "", fields);
+
+        Assert.Equal(2, project.Fields.Count);
+    }
 }

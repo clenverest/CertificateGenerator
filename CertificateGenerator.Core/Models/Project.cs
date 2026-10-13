@@ -32,13 +32,15 @@ public sealed class Project
     /// </summary>
     /// <param name="name">Имя проекта.</param>
     /// <param name="createdAt">Дата и время создания.</param>
-    /// <param name="sourceFileName">Имя исходного файла таблицы.</param>
+    /// <param name="sourceFileName">Имя исходного файла таблицы.
+    /// Может быть пустой строкой, если таблица ещё не загружена.</param>
     /// <param name="fields">Список полей. Может быть пустым.</param>
     /// <exception cref="ArgumentException">
-    /// Бросается, если имя проекта или имя исходного файла пусты.
+    /// Бросается, если имя проекта пусто.
     /// </exception>
     /// <exception cref="ArgumentNullException">
-    /// Бросается, если <paramref name="fields"/> равен null.
+    /// Бросается, если <paramref name="sourceFileName"/>
+    /// или <paramref name="fields"/> равны <c>null</c>.
     /// </exception>
     public Project(
         string name,
@@ -51,6 +53,10 @@ public sealed class Project
             throw new ArgumentException("Имя проекта не может быть пустым.", nameof(name));
         }
 
+        if (sourceFileName is null)
+        {
+            throw new ArgumentNullException(nameof(sourceFileName));
+        }
 
         if (fields is null)
         {

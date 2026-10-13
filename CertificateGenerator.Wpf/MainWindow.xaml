@@ -2,9 +2,12 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:CertificateGenerator.Wpf"
+        xmlns:models="clr-namespace:CertificateGenerator.Core.Models;assembly=CertificateGenerator.Core"
         Title="CertificateGenerator"
         Height="600"
-        Width="900"
+        Width="1200"
+        MinWidth="900"
+        MinHeight="500"
         WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
@@ -18,9 +21,13 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
 
         <!-- Шапка проекта -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
             <TextBlock Text="{Binding ProjectName}"
                        FontSize="20"
                        FontWeight="SemiBold"
@@ -34,7 +41,7 @@
         </StackPanel>
 
         <!-- Панель инструментов -->
-        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,12">
             <StackPanel Orientation="Horizontal">
                 <Button Content="Загрузить таблицу в проект"
                         Command="{Binding LoadTableIntoProjectCommand}"
@@ -76,7 +83,7 @@
         </StackPanel>
 
         <!-- Плашка ошибки -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="2" Grid.ColumnSpan="2"
                 Background="#FDE7E9"
                 BorderBrush="#C42B1C"
                 BorderThickness="1"
@@ -92,7 +99,7 @@
 
         <!-- Таблица -->
         <DataGrid x:Name="ParticipantsGrid"
-                  Grid.Row="3"
+                  Grid.Row="3" Grid.Column="0"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   CanUserAddRows="False"
@@ -102,5 +109,97 @@
                   Background="White"
                   BorderBrush="#E0E0E0"
                   BorderThickness="1" />
+
+        <!-- Панель полей проекта -->
+        <Border Grid.Row="3" Grid.Column="1"
+                Width="300"
+                Margin="12,0,0,0"
+                BorderBrush="#E0E0E0"
+                BorderThickness="1"
+                Background="White"
+                Visibility="{Binding HasProject, Converter={StaticResource BoolToVisibility}}">
+            <Grid Margin="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Заголовок -->
+                <TextBlock Grid.Row="0"
+                           Text="Поля проекта"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="#0078D4"
+                           Margin="0,0,0,8" />
+
+                <!-- Список полей -->
+                <ListBox Grid.Row="1"
+                         x:Name="FieldsList"
+                         ItemsSource="{Binding Fields.Fields}"
+                         SelectedItem="{Binding Fields.SelectedField, Mode=TwoWay}"
+                         BorderBrush="#E0E0E0"
+                         BorderThickness="1"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="4,2">
+                                <TextBlock Text="{Binding Name}"
+                                           FontSize="14"
+                                           FontWeight="SemiBold" />
+                                <TextBlock FontSize="11"
+                                           Foreground="#605E5C"
+                                           Margin="0,2,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="Обычное" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Kind}"
+                                                             Value="{x:Static models:FieldKind.FullName}">
+                                                    <Setter Property="Text" Value="ФИО" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}"
+                                                             Value="{x:Static models:FieldKind.Static}">
+                                                    <Setter Property="Text" Value="Статическое" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Кнопки -->
+                <StackPanel Grid.Row="2"
+                            Orientation="Horizontal"
+                            Margin="0,8,0,0">
+                    <Button Content="Добавить"
+                            Command="{Binding Fields.AddFieldCommand}"
+                            Padding="10,6"
+                            Background="#0078D4"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Cursor="Hand" />
+
+                    <Button Content="Изменить"
+                            Command="{Binding Fields.EditFieldCommand}"
+                            Padding="10,6"
+                            Margin="6,0,0,0"
+                            Background="#F3F3F3"
+                            BorderThickness="0"
+                            Cursor="Hand" />
+
+                    <Button Content="Удалить"
+                            Command="{Binding Fields.DeleteFieldCommand}"
+                            Padding="10,6"
+                            Margin="6,0,0,0"
+                            Background="#F3F3F3"
+                            BorderThickness="0"
+                            Cursor="Hand" />
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

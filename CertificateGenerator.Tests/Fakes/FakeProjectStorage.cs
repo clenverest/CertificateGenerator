@@ -22,6 +22,16 @@ public sealed class FakeProjectStorage : IProjectStorage
     public string? GetSourceTablePathToReturn { get; set; }
     public List<(string ProjectFolderPath, string SourceFilePath)> SetSourceTableCalls { get; } = new();
 
+    /// <summary>
+    /// Все вызовы Save: (папка проекта, сохранённый проект).
+    /// </summary>
+    public List<(string ProjectFolderPath, Project Project)> SaveCalls { get; } = new();
+
+    /// <summary>
+    /// Исключение, которое бросит Save, если задано.
+    /// </summary>
+    public Exception? ExceptionToThrowOnSave { get; set; }
+
     public Project Create(string projectFolderPath, string projectName)
     {
         CreatedPaths.Add(projectFolderPath);
@@ -46,7 +56,12 @@ public sealed class FakeProjectStorage : IProjectStorage
 
     public void Save(Project project, string projectFolderPath)
     {
-        // В тестах ViewModel-ей сохранение не вызывается.
+        SaveCalls.Add((projectFolderPath, project));
+
+        if (ExceptionToThrowOnSave is not null)
+        {
+            throw ExceptionToThrowOnSave;
+        }
     }
 
     public bool Exists(string projectFolderPath)

@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.IO;
 using CertificateGenerator.Core.Interfaces;
 using CertificateGenerator.Core.Models;
@@ -17,6 +18,12 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IProjectStorage _projectStorage;
     private readonly IWindowNavigator _navigator;
 
+    /// <summary>
+    /// Пока true — изменения в <see cref="Fields"/> игнорируются
+    /// (идёт загрузка полей из проекта, сохранять не нужно).
+    /// </summary>
+    private bool _isLoadingFields;
+
     [ObservableProperty]
     private TableData? _tableData;
 
@@ -34,6 +41,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _projectFolderPath;
+
+    /// <summary>
+    /// ViewModel для работы со списком полей проекта.
+    /// </summary>
+    public FieldsViewModel Fields { get; }
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
@@ -55,11 +67,17 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(
         ITableReaderResolver tableReaderResolver,
         IProjectStorage projectStorage,
-        IWindowNavigator navigator)
+        IWindowNavigator navigator,
+        FieldsViewModel fields)
     {
         _tableReaderResolver = tableReaderResolver;
         _projectStorage = projectStorage;
         _navigator = navigator;
+        Fields = fields;
+
+        // Подписка — до любых изменений Fields,
+        // чтобы не потерять CollectionChanged.
+        Fields.Fields.CollectionChanged += OnFieldsCollectionChanged;
     }
 
     /// <summary>
@@ -72,7 +90,63 @@ public sealed partial class MainViewModel : ObservableObject
         CurrentProject = project;
         ProjectFolderPath = projectFolderPath;
 
+        _isLoadingFields = true;
+        try
+        {
+            Fields.LoadFields(project.Fields);
+        }
+        finally
+        {
+            _isLoadingFields = false;
+        }
+
         TryLoadExistingTable();
+    }
+
+    // ---------------------------------------------------------------------
+    // Реакция на изменение списка полей
+    // ---------------------------------------------------------------------
+
+    private void OnFieldsCollectionChanged(
+        object? sender,
+        NotifyCollectionChangedEventArgs e)
+    {
+        if (_isLoadingFields)
+        {
+            return;
+        }
+
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            return;
+        }
+
+        var updated = WithFields(Fields.GetFieldsSnapshot());
+
+        try
+        {
+            _projectStorage.Save(updated, ProjectFolderPath);
+            CurrentProject = updated;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Не удалось сохранить поля: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Создать копию <see cref="CurrentProject"/> с новым списком полей.
+    /// </summary>
+    private Project WithFields(IReadOnlyList<Field> fields)
+    {
+        var project = CurrentProject
+            ?? throw new InvalidOperationException("Проект не открыт.");
+
+        return new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            fields);
     }
 
     // ---------------------------------------------------------------------
