@@ -81,149 +81,56 @@
 
 ### ✅ Этап 1 завершён: загрузка и просмотр таблицы
 
-Что работает:
+Загрузка `.xlsx` / `.csv`, отображение в `DataGrid`,
+обработка ошибок, сводка.
 
-- Создание solution: `Core`, `Infrastructure`, `Wpf`, `Tests`.
-- `Core/Models`: `TableData`, `ColumnInfo` — иммутабельные модели.
-- `Core/Interfaces`: `ITableReader`, `ITableReaderResolver`.
-- `Infrastructure/Readers`: `ClosedXmlTableReader` (.xlsx), `CsvTableReader` (.csv),
-  `TableReaderResolver` (выбор по расширению).
-- `Wpf/ViewModels`: `MainViewModel` с `OpenFileCommand`, `LoadTable`,
-  свойствами `TableData`, `ErrorMessage`, `IsBusy`, `SelectedFilePath`,
-  вычисляемыми `HasError`, `HasSummary`, `TableSummary`.
-- `Wpf/MainWindow`: кнопка «Открыть файл», диалог `OpenFileDialog` с фильтром,
-  `DataGrid` с динамической генерацией колонок, плашка ошибки,
-  индикатор загрузки, сводка «Загружено: N × M».
-- Обработка ошибок: `NotSupportedException`, `FileNotFoundException`,
-  `InvalidDataException`, `IOException`, непредвиденные.
-- `Tests`: 66 тестов, все зелёные.
+### ✅ Этап 2 завершён: проект, поля, валидация, редактирование
 
-Что умеет приложение:
+**2.0 — каркас.**
+- Модели: `Project`, `Field`, `FieldKind`, `ValidationIssue`, `IssueSeverity`.
+- Интерфейсы: `IProjectStorage`, `IValidator`.
+- Тесты на модели.
 
-- Открывать `.xlsx` и `.csv` (разделители `,` и `;`, кодировки UTF-8 с/без BOM,
-  UTF-16 LE/BE, Windows-1251).
-- Показывать таблицу в `DataGrid`.
-- Обрабатывать ошибки с понятными сообщениями на русском.
-- Показывать путь, сводку, индикатор загрузки.
-- Блокировать кнопку во время загрузки.
+**2.1 — хранилище проекта.**
+- `JsonProjectStorage`: `Create` / `Load` / `Save` / `Exists` / `SetSourceTable` / `GetSourceTablePath`.
+- Сериализация через `System.Text.Json` (WriteIndented, UnsafeRelaxedJsonEscaping для кириллицы).
+- Тесты с `TempFolder`.
 
-Что **не** делаем на Этапе 1 (сознательно):
+**2.2 — стартовый экран, DI, диалоги.**
+- DI-контейнер в `App.xaml.cs`.
+- `RecentProjectsStore` — список последних проектов в `%APPDATA%`.
+- `ProjectViewModel` — создание / открытие проекта, список последних.
+- `StartupWindow` — стартовый экран.
+- `CreateProjectDialog` — свой диалог создания (имя + расположение).
+- `IFolderPicker`, `ICreateProjectDialogService` — абстракции.
 
-- Проект как папка с `project.json` — Этап 2.
-- Сохранение данных между сессиями — Этап 2.
-- DI-контейнер — Этап 2.
-- Асинхронное чтение — отложено до этапа массовой генерации.
+**2.3 — загрузка таблицы в проект.**
+- `IWindowNavigator` — навигация между `StartupWindow` и `MainWindow`.
+- `MainViewModel` — работа с проектом и таблицей.
+- Загрузка таблицы **в проект**: копирование в `source/`, обновление `project.json`.
+- Автозагрузка таблицы из `source/` при открытии проекта.
+- `MainWindow` — шапка проекта, кнопка «Загрузить таблицу в проект».
 
-### 🔄 Этап 2 в работе: сопоставление, валидация, редактирование
+### 🔄 Этап 2.4 в работе: поля проекта
 
-См. подробное описание ниже.
-
-## Этапы разработки
-
-### ✅ Этап 1. Загрузка и просмотр таблицы
-
-Загрузить .xlsx или .csv. Увидеть список участников в таблице.
-
-**Тест:** загрузил файл — увидел данные. ✅ Пройден.
-
-### 🔄 Этап 2. Проект, поля, валидация, редактирование
-
-**Цель этапа:** пользователь создаёт проект (папку), загружает в него таблицу,
-создаёт список полей (ФИО, Класс, Город, Школа, свои), сопоставляет поля
-с колонками таблицы, видит ошибки и предупреждения, редактирует данные,
-сохраняет изменения в проект.
+**Цель:** пользователь создаёт список полей (ФИО, Класс, Город, Школа, свои),
+сопоставляет их с колонками таблицы, видит ошибки и предупреждения,
+редактирует данные.
 
 **Тест этапа:** исправил ошибку — она исчезла.
 
-#### Функциональные требования этапа
-
-1. **Проект как папка.**
-   - Создание проекта: пользователь выбирает папку, приложение создаёт
-     структуру проекта внутри.
-   - Открытие проекта: пользователь выбирает папку с `project.json`.
-   - Список последних проектов (последние 5–10).
-   - Структура папки проекта:
-   MyProject/
-├── project.json ← настройки проекта
-├── source/ ← копия исходной таблицы (не трогаем оригинал)
-│ └── data.xlsx
-├── template/ ← PNG-шаблон (Этап 3)
-└── output/ ← результаты генерации (Этапы 4–5)
-
-
-2. **Модель проекта.**
-- `Project` — корневая модель: путь, имя, дата создания, ссылка на таблицу,
-список полей, настройки.
-- `project.json` — сериализация через `System.Text.Json`.
-
-3. **Поля.**
-- `Field` — модель поля: имя, тип (обычное / ФИО-склейка), источники
-(индексы колонок), обязательность.
-- Создание полей: ФИО (1–3 колонки), Класс, Город, Школа, свои.
-- Сопоставление: для каждого поля — выпадающий список колонок таблицы.
-- Автоподсказка: если имя колонки похоже на имя поля — подставить.
-
-4. **Валидация.**
-- Пустое обязательное поле → ошибка.
-- Дубликат значения → предупреждение.
-- Лишние пробелы → автоисправление (trim).
-- Результат: список `ValidationIssue` (severity, rowIndex, fieldName, message).
-
-5. **Редактирование.**
-- Редактирование ячейки.
-- Удаление строки.
-- Добавление строки.
-- Все изменения — в памяти, поверх исходной таблицы.
-- Исходный файл **не трогается**.
-
-6. **Сохранение / отмена.**
-- «Сохранить» — записать текущее состояние в `project.json` и, опционально,
-в `source/data.processed.xlsx` (не трогая `data.xlsx`).
-- «Отмена» — вернуться к исходной таблице (загрузить заново из `source/`).
-
-7. **Экран проверки.**
-- Таблица с подсветкой: ошибки — красным, предупреждения — жёлтым.
-- Сводка: «N ошибок, M предупреждений».
-
 #### Подэтапы
 
-- **2.0.** Каркас: модели `Project`, `Field`, `ValidationIssue`, интерфейсы
-`IProjectStorage`, `IValidator`. Тесты на модели.
-- **2.1.** Хранилище проекта: `JsonProjectStorage` в `Infrastructure/Storage`.
-Создание / открытие / сохранение `project.json`. Тесты.
-- **2.2.** UI создания / открытия проекта. Кнопки «Создать проект», «Открыть
-проект», список последних. `ProjectViewModel`.
-- **2.3.** Загрузка таблицы **в проект**: копирование исходного `.xlsx` / `.csv`
-в `source/`. Чтение оттуда.
 - **2.4.** Модель `Field` и создание полей. UI: список полей, кнопки
-«Добавить поле», «Удалить поле», «Редактировать поле».
-- **2.5.** Сопоставление полей с колонками: выпадающие списки, автоподсказка
-по имени колонки.
-- **2.6.** Поле ФИО: склейка из 1–3 колонок. UI выбора колонок и порядка.
+  «Добавить поле», «Удалить поле», «Редактировать поле».
+- **2.5.** Сопоставление полей с колонками: выпадающие списки, автоподсказка.
+- **2.6.** Поле ФИО: склейка из 1–3 колонок.
 - **2.7.** Валидация: `RequiredFieldValidator`, `DuplicateValidator`,
-`WhitespaceValidator`. Возвращают `IReadOnlyList<ValidationIssue>`.
-- **2.8.** Редактирование: `DataGrid` с редактируемыми ячейками, кнопки
-«Удалить строку», «Добавить строку».
-- **2.9.** Экран проверки: подсветка ячеек через `Style` + `DataTrigger`,
-сводка ошибок.
-- **2.10.** Сохранение / отмена: запись в `project.json`, загрузка из `source/`.
+  `WhitespaceValidator`.
+- **2.8.** Редактирование: `DataGrid` с редактируемыми ячейками.
+- **2.9.** Экран проверки: подсветка ячеек, сводка.
+- **2.10.** Сохранение / отмена.
 - **2.11.** Приёмка Этапа 2.
-
-#### Технические решения Этапа 2
-
-- **DI-контейнер:** подключаем `Microsoft.Extensions.DependencyInjection`
-в `App.xaml.cs`. Регистрируем `IProjectStorage`, `ITableReaderResolver`,
-`MainViewModel`, `ProjectViewModel`.
-- **JSON-сериализация:** `System.Text.Json` с `JsonSerializerOptions`:
-`WriteIndented = true`, `Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping`
-(чтобы кириллица не экранировалась в `\uXXXX`).
-- **Тесты:** на каждую модель и сервис — минимум один тест. На валидаторы —
-по одному тесту на правило.
-- **Обновление UI:** изменения в `TableData` идут через создание нового
-экземпляра (иммутабельность сохраняем). ViewModel подписывается на
-`PropertyChanged` и пересчитывает валидацию.
-- **Подсветка ячеек:** в `DataGrid` используем `ElementStyle` и `EditingElementStyle`
-с `DataTrigger` на результат валидации.
 
 #### Что **не** делаем на Этапе 2
 
@@ -252,50 +159,67 @@
 
 **Тест:** получил ZIP с 10 грамотами.
 
-## Структура проекта (текущая и планируемая)
+## Структура проекта
+
+```
 CertificateGenerator/
 ├── CertificateGenerator.sln
 ├── readme.md
 ├── .gitignore
 ├── CertificateGenerator.Core/
-│ ├── Models/
-│ │ ├── ColumnInfo.cs ✅
-│ │ ├── TableData.cs ✅
-│ │ ├── Project.cs ⏳ Этап 2
-│ │ ├── Field.cs ⏳ Этап 2
-│ │ └── ValidationIssue.cs ⏳ Этап 2
-│ ├── Interfaces/
-│ │ ├── ITableReader.cs ✅
-│ │ ├── ITableReaderResolver.cs ✅
-│ │ ├── IProjectStorage.cs ⏳ Этап 2
-│ │ └── IValidator.cs ⏳ Этап 2
-│ └── Validators/ ⏳ Этап 2
+│   ├── Models/
+│   │   ├── ColumnInfo.cs ✅
+│   │   ├── TableData.cs ✅
+│   │   ├── Project.cs ✅
+│   │   ├── Field.cs ✅
+│   │   ├── FieldKind.cs ✅
+│   │   ├── ValidationIssue.cs ✅
+│   │   ├── IssueSeverity.cs ✅
+│   │   ├── RecentProject.cs ✅
+│   │   └── CreateProjectResult.cs ✅
+│   ├── Interfaces/
+│   │   ├── ITableReader.cs ✅
+│   │   ├── ITableReaderResolver.cs ✅
+│   │   ├── IProjectStorage.cs ✅
+│   │   ├── IValidator.cs ✅
+│   │   ├── IRecentProjectsStore.cs ✅
+│   │   ├── IFolderPicker.cs ✅
+│   │   ├── ICreateProjectDialogService.cs ✅
+│   │   └── IWindowNavigator.cs ✅
+│   └── Validators/ ⏳ Этап 2.7
 ├── CertificateGenerator.Infrastructure/
-│ ├── Readers/
-│ │ ├── ClosedXmlTableReader.cs ✅
-│ │ ├── CsvTableReader.cs ✅
-│ │ └── TableReaderResolver.cs ✅
-│ ├── Storage/
-│ │ └── JsonProjectStorage.cs ⏳ Этап 2
-│ ├── Generators/ ⏳ Этапы 4–5
-│ └── ZipPacker.cs ⏳ Этап 5
+│   ├── Readers/
+│   │   ├── ClosedXmlTableReader.cs ✅
+│   │   ├── CsvTableReader.cs ✅
+│   │   └── TableReaderResolver.cs ✅
+│   ├── Storage/
+│   │   ├── JsonProjectStorage.cs ✅
+│   │   └── JsonRecentProjectsStore.cs ✅
+│   ├── Generators/ ⏳ Этапы 4–5
+│   └── ZipPacker.cs ⏳ Этап 5
 ├── CertificateGenerator.Wpf/
-│ ├── ViewModels/
-│ │ ├── MainViewModel.cs ✅
-│ │ ├── ProjectViewModel.cs ⏳ Этап 2
-│ │ └── FieldsViewModel.cs ⏳ Этап 2
-│ ├── Views/ ⏳ Этап 2
-│ ├── App.xaml ✅
-│ ├── App.xaml.cs ✅ (DI — Этап 2)
-│ └── MainWindow.xaml ✅
+│   ├── Services/
+│   │   ├── WpfFolderPicker.cs ✅
+│   │   ├── CreateProjectDialogService.cs ✅
+│   │   └── WpfWindowNavigator.cs ✅
+│   ├── Views/
+│   │   └── CreateProjectDialog.xaml + .cs ✅
+│   ├── ViewModels/
+│   │   ├── MainViewModel.cs ✅
+│   │   ├── ProjectViewModel.cs ✅
+│   │   └── FieldsViewModel.cs ⏳ Этап 2.4
+│   ├── App.xaml ✅ (без StartupUri)
+│   ├── App.xaml.cs ✅ (DI)
+│   ├── MainWindow.xaml + .cs ✅
+│   └── StartupWindow.xaml + .cs ✅
 └── CertificateGenerator.Tests/
-├── Models/ ✅
-├── Fakes/ ✅
-├── Readers/ ✅
-├── ViewModels/ ✅
-├── Storage/ ⏳ Этап 2
-└── Validators/ ⏳ Этап 2
-
+    ├── Models/ ✅
+    ├── Fakes/ ✅
+    ├── Readers/ ✅
+    ├── Storage/ ✅
+    ├── ViewModels/ ✅
+    └── Validators/ ⏳ Этап 2.7
+```
 
 ## Ограничения MVP (Future work)
 
@@ -311,19 +235,15 @@ CertificateGenerator/
 
 ## Как запустить
 
-*(будет заполнено после реализации Этапа 2)*
-
-Пока:
-
 1. Установить .NET 8 SDK.
 2. Клонировать репозиторий.
 3. `dotnet build` — собрать.
-4. `dotnet test` — прогнать тесты (66 зелёных на момент завершения Этапа 1).
+4. `dotnet test` — прогнать тесты (128 зелёных на момент завершения 2.3).
 5. `dotnet run --project CertificateGenerator.Wpf` — запустить приложение.
 
 ## Репозиторий
 
-*(ссылка на GitHub — добавить после создания)*
+https://github.com/clenverest/CertificateGenerator
 
 ## Применение «Золотых правил»
 
@@ -332,27 +252,42 @@ CertificateGenerator/
 
 ## Контекст для продолжения в новом чате
 
-**Где мы:** Этап 1 завершён. Этап 2 в работе — на подэтапе 2.0 (модели и интерфейсы).
+**Где мы:** Этапы 1 и 2 (подэтапы 2.0–2.3) завершены.
+Подэтап 2.4 в работе (поля проекта, UI).
 
 **Что важно помнить при продолжении:**
 
-- Архитектура трёхслойная: `Core` → `Infrastructure` → `Wpf`. Зависимости
-  направлены внутрь, `Core` ничего не знает о внешних слоях.
+- Архитектура трёхслойная: `Core` → `Infrastructure` → `Wpf`.
+  Зависимости направлены внутрь, `Core` ничего не знает о внешних слоях.
 - Тесты — только в `CertificateGenerator.Tests`. `Core` без внешних пакетов.
-- Тесты ссылаются на `Core`, `Infrastructure` и `Wpf` (последнее — для
-  тестирования ViewModel). `TargetFramework` тестов — `net8.0-windows`.
-- `InternalsVisibleTo("CertificateGenerator.Tests")` в `Wpf.csproj` — для
-  тестирования `internal`-методов ViewModel.
-- Иммутабельность моделей: `TableData` и `ColumnInfo` — `sealed`, свойства
-  только `get`, изменения через создание нового экземпляра.
-- Диалоги: `Microsoft.Win32.OpenFileDialog` прямо во ViewModel (без абстракции
-  `IFileDialogService` на Этапе 1). Логика чтения вынесена в `internal`
-  метод `LoadTable` — тестируется напрямую.
-- Команды: `CommunityToolkit.Mvvm` — `[ObservableProperty]`, `[RelayCommand]`,
-  `partial void On...Changed` для пересчёта вычисляемых свойств.
-- DI: пока не подключён. На Этапе 2 подключим в `App.xaml.cs`.
-- Все сообщения пользователю — на русском.
-- Стиль UI — Windows 11, акцент `#0078D4`. Ошибки — `#C42B1C` на фоне
-  `#FDE7E9`. Успех — `#107C10`. Вторичный текст — `#605E5C`.
+  Тесты ссылаются на `Core`, `Infrastructure` и `Wpf`.
+  `TargetFramework` тестов — `net8.0-windows`.
+- `InternalsVisibleTo("CertificateGenerator.Tests")` в `Wpf.csproj`
+  и `Infrastructure.csproj`.
+- Иммутабельность моделей: `TableData`, `ColumnInfo`, `Project`, `Field`,
+  `ValidationIssue`, `RecentProject`, `CreateProjectResult` — `sealed`,
+  свойства только `get`, изменения через создание нового экземпляра.
+- DI: `Microsoft.Extensions.DependencyInjection` подключён в `App.xaml.cs`.
+  Все зависимости регистрируются в `ConfigureServices`.
+  **Правило:** новая зависимость в конструкторе DI-создаваемого класса
+  требует регистрации, иначе приложение упадёт на `GetRequiredService`.
+- Диалоги: `Microsoft.Win32.OpenFileDialog` и `OpenFolderDialog` —
+  прямо во ViewModel или в отдельном сервисе (`IFolderPicker`,
+  `ICreateProjectDialogService`).
+- Команды: `CommunityToolkit.Mvvm` — `[ObservableProperty]`,
+  `[RelayCommand]`, `partial void On...Changed` для пересчёта
+  вычисляемых свойств.
+- **Важно про `PropertyChanged`:** подписка на `PropertyChanged`
+  в окне **до** того, как ViewModel изменяет свойства. Иначе событие
+  теряется. См. `WpfWindowNavigator.NavigateToMain` — `Initialize`
+  вызывается **после** `new MainWindow(...)`.
+- Язык интерфейса: русский. Сообщения об ошибках — на русском.
+- Стиль: Windows 11. Акцент `#0078D4`. Ошибки — `#C42B1C`
+  на фоне `#FDE7E9`. Успех `#107C10`. Вторичный текст `#605E5C`.
+- Проект как папка: `project.json`, `source/`, `template/`, `output/`.
+- `RecentProjectsStore` — в `%APPDATA%\CertificateGenerator\recent.json`.
+  Кириллица не экранируется (UnsafeRelaxedJsonEscaping).
+- **Актуальное число тестов — проверяй через `dotnet test`.**
+  Я (ассистент) часто ошибаюсь в подсчётах. Считай «было N, добавили M,
+  стало N+M».
 
-  
