@@ -11,18 +11,26 @@ public sealed class FakeFieldEditDialogService : IFieldEditDialogService
     public Field? FieldToReturnOnCreate { get; set; }
     public Field? FieldToReturnOnEdit { get; set; }
 
-    public List<IReadOnlyList<string>> ShowCreateCalls { get; } = new();
-    public List<(Field Field, IReadOnlyList<string> OtherNames)> ShowEditCalls { get; } = new();
+    public List<(IReadOnlyList<string> ExistingNames, IReadOnlyList<ColumnInfo> Columns)>
+        ShowCreateCalls { get; } = new();
 
-    public Field? ShowCreate(IReadOnlyList<string> existingNames)
+    public List<(Field Field, IReadOnlyList<string> OtherNames, IReadOnlyList<ColumnInfo> Columns)>
+        ShowEditCalls { get; } = new();
+
+    public Field? ShowCreate(
+        IReadOnlyList<string> existingNames,
+        IReadOnlyList<ColumnInfo> columns)
     {
-        ShowCreateCalls.Add(existingNames);
+        ShowCreateCalls.Add((existingNames, columns));
         return FieldToReturnOnCreate;
     }
 
-    public Field? ShowEdit(Field field, IReadOnlyList<string> existingNames)
+    public Field? ShowEdit(
+        Field field,
+        IReadOnlyList<string> existingNames,
+        IReadOnlyList<ColumnInfo> columns)
     {
-        ShowEditCalls.Add((field, existingNames));
+        ShowEditCalls.Add((field, existingNames, columns));
         return FieldToReturnOnEdit;
     }
 }

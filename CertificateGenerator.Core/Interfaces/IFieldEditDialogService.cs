@@ -4,25 +4,28 @@ namespace CertificateGenerator.Core.Interfaces;
 
 /// <summary>
 /// Сервис показа диалога создания/редактирования поля.
-/// Живёт в Core, потому что ViewModel (Core не знает о WPF)
-/// не должна зависеть от WPF-окна.
 /// </summary>
 public interface IFieldEditDialogService
 {
     /// <summary>
     /// Показать диалог создания нового поля.
     /// </summary>
-    /// <param name="existingNames">Имена уже существующих полей
-    /// (для проверки дубликата).</param>
+    /// <param name="existingNames">Имена уже существующих полей.</param>
+    /// <param name="columns">Колонки таблицы для выбора источника.</param>
     /// <returns>Созданное поле или <c>null</c>, если пользователь отменил.</returns>
-    Field? ShowCreate(IReadOnlyList<string> existingNames);
+    Field? ShowCreate(
+        IReadOnlyList<string> existingNames,
+        IReadOnlyList<ColumnInfo> columns);
 
     /// <summary>
     /// Показать диалог редактирования существующего поля.
     /// </summary>
     /// <param name="field">Поле для редактирования.</param>
-    /// <param name="existingNames">Имена других полей
-    /// (без имени редактируемого поля).</param>
+    /// <param name="existingNames">Имена других полей.</param>
+    /// <param name="columns">Колонки таблицы для выбора источника.</param>
     /// <returns>Обновлённое поле или <c>null</c>, если пользователь отменил.</returns>
-    Field? ShowEdit(Field field, IReadOnlyList<string> existingNames);
+    Field? ShowEdit(
+        Field field,
+        IReadOnlyList<string> existingNames,
+        IReadOnlyList<ColumnInfo> columns);
 }

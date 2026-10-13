@@ -21,6 +21,17 @@ public sealed partial class FieldsViewModel : ObservableObject
     public ObservableCollection<Field> Fields { get; } = new();
 
     /// <summary>
+    /// Колонки загруженной таблицы. Пусто, если таблица ещё не загружена.
+    /// </summary>
+    public IReadOnlyList<ColumnInfo> Columns { get; private set; } =
+        Array.Empty<ColumnInfo>();
+
+    /// <summary>
+    /// Есть ли загруженная таблица с колонками.
+    /// </summary>
+    public bool HasColumns => Columns.Count > 0;
+
+    /// <summary>
     /// Выбранное поле. <c>null</c>, если ничего не выбрано.
     /// </summary>
     [ObservableProperty]
@@ -51,6 +62,18 @@ public sealed partial class FieldsViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Установить колонки таблицы. Вызывается из MainViewModel
+    /// при загрузке таблицы.
+    /// </summary>
+    public void SetColumns(IReadOnlyList<ColumnInfo> columns)
+    {
+        Columns = columns ?? Array.Empty<ColumnInfo>();
+        OnPropertyChanged(nameof(Columns));
+        OnPropertyChanged(nameof(HasColumns));
+        AddFieldCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
     /// Снимок текущего списка полей — для сохранения в <see cref="Project"/>.
     /// </summary>
     public IReadOnlyList<Field> GetFieldsSnapshot()
@@ -65,10 +88,10 @@ public sealed partial class FieldsViewModel : ObservableObject
     /// <summary>
     /// Добавить поле — открыть диалог создания.
     /// </summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAddField))]
     private void AddField()
     {
-        var created = _dialogService.ShowCreate(ExistingNames);
+        var created = _dialogService.ShowCreate(ExistingNames, Columns);
         if (created is null)
         {
             return;
@@ -89,19 +112,17 @@ public sealed partial class FieldsViewModel : ObservableObject
             return;
         }
 
-        // Имена других полей — для проверки дубликата.
         var otherNames = Fields
             .Where(f => !ReferenceEquals(f, SelectedField))
             .Select(f => f.Name)
             .ToList();
 
-        var updated = _dialogService.ShowEdit(SelectedField, otherNames);
+        var updated = _dialogService.ShowEdit(SelectedField, otherNames, Columns);
         if (updated is null)
         {
             return;
         }
 
-        // Заменяем элемент в коллекции (Field иммутабельный).
         var index = Fields.IndexOf(SelectedField);
         Fields[index] = updated;
         SelectedField = updated;
@@ -131,6 +152,11 @@ public sealed partial class FieldsViewModel : ObservableObject
 
         Fields.Remove(SelectedField);
         SelectedField = null;
+    }
+
+    private bool CanAddField()
+    {
+        return HasColumns;
     }
 
     private bool CanEditOrDelete()

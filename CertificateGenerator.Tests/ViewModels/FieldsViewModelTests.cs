@@ -11,6 +11,8 @@ public class FieldsViewModelTests
         return new Field(name, FieldKind.Simple, new[] { 0 });
     }
 
+    private static ColumnInfo Col(int index, string name) => new(index, name);
+
     private static FieldsViewModel CreateViewModel(
         FakeFieldEditDialogService? dialogService = null)
     {
@@ -24,6 +26,31 @@ public class FieldsViewModelTests
 
         Assert.Empty(vm.Fields);
         Assert.Null(vm.SelectedField);
+        Assert.Empty(vm.Columns);
+        Assert.False(vm.HasColumns);
+    }
+
+    [Fact]
+    public void SetColumns_StoresAndUpdatesHasColumns()
+    {
+        var vm = CreateViewModel();
+        var columns = new[] { Col(0, "ФИО"), Col(1, "Класс") };
+
+        vm.SetColumns(columns);
+
+        Assert.Equal(2, vm.Columns.Count);
+        Assert.True(vm.HasColumns);
+    }
+
+    [Fact]
+    public void SetColumns_Null_TreatedAsEmpty()
+    {
+        var vm = CreateViewModel();
+
+        vm.SetColumns(null!);
+
+        Assert.Empty(vm.Columns);
+        Assert.False(vm.HasColumns);
     }
 
     [Fact]
@@ -31,6 +58,7 @@ public class FieldsViewModelTests
     {
         var dialog = new FakeFieldEditDialogService { FieldToReturnOnCreate = null };
         var vm = CreateViewModel(dialog);
+        vm.SetColumns(new[] { Col(0, "ФИО") });   // ← добавить
 
         vm.AddFieldCommand.Execute(null);
 
@@ -44,6 +72,7 @@ public class FieldsViewModelTests
         var created = MakeSimple("Школа");
         var dialog = new FakeFieldEditDialogService { FieldToReturnOnCreate = created };
         var vm = CreateViewModel(dialog);
+        vm.SetColumns(new[] { Col(0, "ФИО") });   // ← добавить
 
         vm.AddFieldCommand.Execute(null);
 
@@ -53,18 +82,21 @@ public class FieldsViewModelTests
     }
 
     [Fact]
-    public void AddField_PassesExistingNamesToDialog()
+    public void AddField_PassesExistingNamesAndColumnsToDialog()
     {
         var dialog = new FakeFieldEditDialogService();
         var vm = CreateViewModel(dialog);
         vm.LoadFields(new[] { MakeSimple("Класс"), MakeSimple("Школа") });
+        vm.SetColumns(new[] { Col(0, "ФИО"), Col(1, "Класс") });
 
         vm.AddFieldCommand.Execute(null);
 
-        var passedNames = dialog.ShowCreateCalls[0];
-        Assert.Equal(2, passedNames.Count);
-        Assert.Contains("Класс", passedNames);
-        Assert.Contains("Школа", passedNames);
+        var call = dialog.ShowCreateCalls[0];
+        Assert.Equal(2, call.ExistingNames.Count);
+        Assert.Contains("Класс", call.ExistingNames);
+        Assert.Contains("Школа", call.ExistingNames);
+        Assert.Equal(2, call.Columns.Count);
+        Assert.Equal("ФИО", call.Columns[0].Name);
     }
 
     [Fact]
@@ -130,10 +162,26 @@ public class FieldsViewModelTests
 
         vm.EditFieldCommand.Execute(null);
 
-        var (_, otherNames) = dialog.ShowEditCalls[0];
-        Assert.Single(otherNames);
-        Assert.Contains("Школа", otherNames);
-        Assert.DoesNotContain("Класс", otherNames);
+        var call = dialog.ShowEditCalls[0];
+        Assert.Single(call.OtherNames);
+        Assert.Contains("Школа", call.OtherNames);
+        Assert.DoesNotContain("Класс", call.OtherNames);
+    }
+
+    [Fact]
+    public void EditField_PassesColumnsToDialog()
+    {
+        var field = MakeSimple("Класс");
+        var dialog = new FakeFieldEditDialogService();
+        var vm = CreateViewModel(dialog);
+        vm.LoadFields(new[] { field });
+        vm.SelectedField = field;
+        vm.SetColumns(new[] { Col(0, "Класс"), Col(1, "Школа") });
+
+        vm.EditFieldCommand.Execute(null);
+
+        var call = dialog.ShowEditCalls[0];
+        Assert.Equal(2, call.Columns.Count);
     }
 
     [Fact]
@@ -148,6 +196,7 @@ public class FieldsViewModelTests
     public void LoadFields_ReplacesContent()
     {
         var vm = CreateViewModel();
+        vm.SetColumns(new[] { Col(0, "ФИО") });   // ← добавить
         vm.AddFieldCommand.Execute(null);
 
         var newFields = new[]
@@ -185,5 +234,33 @@ public class FieldsViewModelTests
         Assert.Equal(2, names.Count);
         Assert.Contains("Класс", names);
         Assert.Contains("Школа", names);
+    }
+
+        [Fact]
+    public void AddField_WithoutColumns_CanExecuteIsFalse()
+    {
+        var vm = CreateViewModel();
+
+        Assert.False(vm.AddFieldCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void AddField_WithColumns_CanExecuteIsTrue()
+    {
+        var vm = CreateViewModel();
+        vm.SetColumns(new[] { Col(0, "ФИО") });
+
+        Assert.True(vm.AddFieldCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SetColumns_FromEmptyToFilled_EnablesAddField()
+    {
+        var vm = CreateViewModel();
+        Assert.False(vm.AddFieldCommand.CanExecute(null));
+
+        vm.SetColumns(new[] { Col(0, "ФИО") });
+
+        Assert.True(vm.AddFieldCommand.CanExecute(null));
     }
 }

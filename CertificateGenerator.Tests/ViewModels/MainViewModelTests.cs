@@ -194,6 +194,7 @@ public sealed class MainViewModelTests
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
+        vm.Fields.SetColumns(new[] { new ColumnInfo(0, "ФИО") }); 
 
         vm.Fields.AddFieldCommand.Execute(null);
 
@@ -220,6 +221,7 @@ public sealed class MainViewModelTests
         var createdAt = new DateTime(2026, 1, 1);
         var project = new Project("A", createdAt, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
+        vm.Fields.SetColumns(new[] { new ColumnInfo(0, "ФИО") }); 
 
         vm.Fields.AddFieldCommand.Execute(null);
 
@@ -250,6 +252,7 @@ public sealed class MainViewModelTests
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
+        vm.Fields.SetColumns(new[] { new ColumnInfo(0, "ФИО") }); 
 
         vm.Fields.AddFieldCommand.Execute(null);
 
@@ -257,5 +260,30 @@ public sealed class MainViewModelTests
         Assert.Contains("Диск недоступен", vm.ErrorMessage!);
         // CurrentProject не должен обновиться.
         Assert.Empty(vm.CurrentProject!.Fields);
+    }
+
+    [Fact]
+    public void LoadTableIntoProjectFromPath_UpdatesFieldsColumns()
+    {
+        var table = new TableData(
+            new[] { new ColumnInfo(0, "ФИО"), new ColumnInfo(1, "Класс") },
+            new[] { (IReadOnlyList<string>)new[] { "Иванов Иван", "5А" } });
+
+        var storage = new FakeProjectStorage
+        {
+            GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
+        };
+        var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
+        var vm = new MainViewModel(
+            resolver, storage, new FakeWindowNavigator(),
+            new FieldsViewModel(new FakeFieldEditDialogService()));
+
+        var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
+        vm.Initialize(project, @"C:\Projects\A");
+
+        vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
+
+        Assert.Equal(2, vm.Fields.Columns.Count);
+        Assert.True(vm.Fields.HasColumns);
     }
 }

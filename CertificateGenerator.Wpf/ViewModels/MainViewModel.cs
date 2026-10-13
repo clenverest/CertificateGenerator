@@ -377,6 +377,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasSummary));
         OnPropertyChanged(nameof(TableSummary));
+
+        Fields.SetColumns(value?.Columns ?? Array.Empty<ColumnInfo>());
     }
 
     partial void OnCurrentProjectChanged(Project? value)

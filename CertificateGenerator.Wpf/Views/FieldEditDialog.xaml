@@ -2,22 +2,25 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Поле"
-        Height="360"
-        Width="480"
+        Height="440"
+        Width="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False">
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />  <!-- Имя: подпись -->
-            <RowDefinition Height="Auto" />  <!-- Имя: TextBox -->
-            <RowDefinition Height="Auto" />  <!-- Тип: подпись -->
-            <RowDefinition Height="Auto" />  <!-- Тип: ComboBox -->
-            <RowDefinition Height="Auto" />  <!-- Значение: подпись (условно) -->
-            <RowDefinition Height="Auto" />  <!-- Значение: TextBox (условно) -->
-            <RowDefinition Height="*" />     <!-- Плашка ошибки -->
-            <RowDefinition Height="Auto" />  <!-- Кнопки -->
+            <RowDefinition Height="Auto" />  <!-- 0: Имя: подпись -->
+            <RowDefinition Height="Auto" />  <!-- 1: Имя: TextBox -->
+            <RowDefinition Height="Auto" />  <!-- 2: Тип: подпись -->
+            <RowDefinition Height="Auto" />  <!-- 3: Тип: ComboBox -->
+            <RowDefinition Height="Auto" />  <!-- 4: Simple — колонка -->
+            <RowDefinition Height="Auto" />  <!-- 5: FullName — колонка 1 -->
+            <RowDefinition Height="Auto" />  <!-- 6: FullName — колонка 2 -->
+            <RowDefinition Height="Auto" />  <!-- 7: FullName — колонка 3 -->
+            <RowDefinition Height="Auto" />  <!-- 8: Static — значение -->
+            <RowDefinition Height="*" />     <!-- 9: Ошибка -->
+            <RowDefinition Height="Auto" />  <!-- 10: Кнопки -->
         </Grid.RowDefinitions>
 
         <!-- Имя поля -->
@@ -53,25 +56,80 @@
             <ComboBoxItem Content="Статическое" Tag="Static" />
         </ComboBox>
 
-        <!-- Значение для статического поля -->
-        <TextBlock x:Name="StaticValueLabel"
-                   Grid.Row="4"
-                   Text="Значение"
-                   FontSize="13"
-                   Foreground="#605E5C"
-                   Margin="0,0,0,4"
-                   Visibility="Collapsed" />
+        <!-- Simple: одна колонка -->
+        <StackPanel x:Name="SimpleColumnPanel"
+                    Grid.Row="4"
+                    Margin="0,0,0,12"
+                    Visibility="Collapsed">
+            <TextBlock Text="Колонка-источник"
+                       FontSize="13"
+                       Foreground="#605E5C"
+                       Margin="0,0,0,4" />
+            <ComboBox x:Name="SimpleColumnBox"
+                      Padding="8,6"
+                      FontSize="14"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Index"
+                      SelectionChanged="OnColumnSelectionChanged" />
+        </StackPanel>
 
-        <TextBox x:Name="StaticValueBox"
-                 Grid.Row="5"
-                 Padding="8,6"
-                 FontSize="14"
-                 TextChanged="OnStaticValueChanged"
-                 Margin="0,0,0,12"
-                 Visibility="Collapsed" />
+        <!-- FullName: колонки 1-3 -->
+        <StackPanel x:Name="FullNamePanel"
+                    Grid.Row="5"
+                    Grid.RowSpan="3"
+                    Visibility="Collapsed">
+            <TextBlock Text="Колонка 1 (фамилия)"
+                       FontSize="13"
+                       Foreground="#605E5C"
+                       Margin="0,0,0,4" />
+            <ComboBox x:Name="FullNameColumn1Box"
+                      Padding="8,6"
+                      FontSize="14"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Index"
+                      SelectionChanged="OnColumnSelectionChanged"
+                      Margin="0,0,0,8" />
+
+            <TextBlock Text="Колонка 2 (имя)"
+                       FontSize="13"
+                       Foreground="#605E5C"
+                       Margin="0,0,0,4" />
+            <ComboBox x:Name="FullNameColumn2Box"
+                      Padding="8,6"
+                      FontSize="14"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Index"
+                      SelectionChanged="OnColumnSelectionChanged"
+                      Margin="0,0,0,8" />
+
+            <TextBlock Text="Колонка 3 (отчество)"
+                       FontSize="13"
+                       Foreground="#605E5C"
+                       Margin="0,0,0,4" />
+            <ComboBox x:Name="FullNameColumn3Box"
+                      Padding="8,6"
+                      FontSize="14"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Index"
+                      SelectionChanged="OnColumnSelectionChanged" />
+        </StackPanel>
+
+        <!-- Static: значение -->
+        <StackPanel x:Name="StaticValuePanel"
+                    Grid.Row="8"
+                    Visibility="Collapsed">
+            <TextBlock Text="Значение"
+                       FontSize="13"
+                       Foreground="#605E5C"
+                       Margin="0,0,0,4" />
+            <TextBox x:Name="StaticValueBox"
+                     Padding="8,6"
+                     FontSize="14"
+                     TextChanged="OnStaticValueChanged" />
+        </StackPanel>
 
         <!-- Плашка ошибки -->
-        <Border Grid.Row="6"
+        <Border Grid.Row="9"
                 x:Name="ErrorPanel"
                 Background="#FDE7E9"
                 BorderBrush="#C42B1C"
@@ -81,7 +139,6 @@
                 Margin="0,4,0,0"
                 VerticalAlignment="Top"
                 Visibility="Collapsed">
-
             <TextBlock x:Name="ErrorText"
                        Foreground="#C42B1C"
                        FontSize="12"
@@ -89,11 +146,10 @@
         </Border>
 
         <!-- Кнопки -->
-        <StackPanel Grid.Row="7"
+        <StackPanel Grid.Row="10"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">
-
             <Button Content="Отмена"
                     Click="OnCancelClick"
                     Padding="16,8"

@@ -7,9 +7,11 @@ namespace CertificateGenerator.Wpf.Services;
 
 public sealed class FieldEditDialogService : IFieldEditDialogService
 {
-    public Field? ShowCreate(IReadOnlyList<string> existingNames)
+    public Field? ShowCreate(
+        IReadOnlyList<string> existingNames,
+        IReadOnlyList<ColumnInfo> columns)
     {
-        var dialog = new FieldEditDialog(existingNames)
+        var dialog = new FieldEditDialog(existingNames, columns)
         {
             Owner = Application.Current.MainWindow
         };
@@ -19,9 +21,12 @@ public sealed class FieldEditDialogService : IFieldEditDialogService
         return result == true ? dialog.Result : null;
     }
 
-    public Field? ShowEdit(Field field, IReadOnlyList<string> existingNames)
+    public Field? ShowEdit(
+        Field field,
+        IReadOnlyList<string> existingNames,
+        IReadOnlyList<ColumnInfo> columns)
     {
-        var dialog = new FieldEditDialog(field, existingNames)
+        var dialog = new FieldEditDialog(field, existingNames, columns)
         {
             Owner = Application.Current.MainWindow
         };
