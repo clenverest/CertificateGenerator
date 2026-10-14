@@ -220,6 +220,94 @@ public sealed class JsonProjectStorage : IProjectStorage
     }
 
     // ---------------------------------------------------------------------
+    // SetTemplate / SetPlacements
+    // ---------------------------------------------------------------------
+
+    public Project SetTemplate(
+        string projectFolderPath,
+        Project project,
+        TemplateInfo template)
+    {
+        if (project is null)
+        {
+            throw new ArgumentNullException(nameof(project));
+        }
+
+        if (template is null)
+        {
+            throw new ArgumentNullException(nameof(template));
+        }
+
+        if (string.IsNullOrWhiteSpace(projectFolderPath))
+        {
+            throw new ArgumentException(
+                "Путь к папке проекта не может быть пустым.",
+                nameof(projectFolderPath));
+        }
+
+        if (!Directory.Exists(projectFolderPath))
+        {
+            throw new DirectoryNotFoundException(
+                $"Папка проекта \"{projectFolderPath}\" не существует.");
+        }
+
+        var updated = new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            project.Fields,
+            project.RowOverrides,
+            template,
+            project.Placements);
+
+        Save(updated, projectFolderPath);
+
+        return updated;
+    }
+
+    public Project SetPlacements(
+        string projectFolderPath,
+        Project project,
+        IReadOnlyList<FieldPlacement> placements)
+    {
+        if (project is null)
+        {
+            throw new ArgumentNullException(nameof(project));
+        }
+
+        if (placements is null)
+        {
+            throw new ArgumentNullException(nameof(placements));
+        }
+
+        if (string.IsNullOrWhiteSpace(projectFolderPath))
+        {
+            throw new ArgumentException(
+                "Путь к папке проекта не может быть пустым.",
+                nameof(projectFolderPath));
+        }
+
+        if (!Directory.Exists(projectFolderPath))
+        {
+            throw new DirectoryNotFoundException(
+                $"Папка проекта \"{projectFolderPath}\" не существует.");
+        }
+
+        var updated = new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            project.Fields,
+            project.RowOverrides,
+            project.Template,
+            placements);
+
+        Save(updated, projectFolderPath);
+
+        return updated;
+    }
+
+    // ---------------------------------------------------------------------
     // Сериализация (internal, тестируется напрямую)
     // ---------------------------------------------------------------------
 

@@ -32,6 +32,26 @@ public sealed class FakeProjectStorage : IProjectStorage
     /// </summary>
     public Exception? ExceptionToThrowOnSave { get; set; }
 
+    /// <summary>
+    /// Все вызовы SetTemplate: (папка проекта, шаблон).
+    /// </summary>
+    public List<(string ProjectFolderPath, TemplateInfo Template)> SetTemplateCalls { get; } = new();
+
+    /// <summary>
+    /// Исключение, которое бросит SetTemplate, если задано.
+    /// </summary>
+    public Exception? ExceptionToThrowOnSetTemplate { get; set; }
+
+    /// <summary>
+    /// Все вызовы SetPlacements: (папка проекта, размещения).
+    /// </summary>
+    public List<(string ProjectFolderPath, IReadOnlyList<FieldPlacement> Placements)> SetPlacementsCalls { get; } = new();
+
+    /// <summary>
+    /// Исключение, которое бросит SetPlacements, если задано.
+    /// </summary>
+    public Exception? ExceptionToThrowOnSetPlacements { get; set; }
+
     public Project Create(string projectFolderPath, string projectName)
     {
         CreatedPaths.Add(projectFolderPath);
@@ -92,5 +112,47 @@ public sealed class FakeProjectStorage : IProjectStorage
     public string? GetSourceTablePath(Project project, string projectFolderPath)
     {
         return GetSourceTablePathToReturn;
+    }
+
+    public Project SetTemplate(
+        string projectFolderPath,
+        Project project,
+        TemplateInfo template)
+    {
+        SetTemplateCalls.Add((projectFolderPath, template));
+        if (ExceptionToThrowOnSetTemplate is not null)
+        {
+            throw ExceptionToThrowOnSetTemplate;
+        }
+
+        return new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            project.Fields,
+            project.RowOverrides,
+            template,
+            project.Placements);
+    }
+
+    public Project SetPlacements(
+        string projectFolderPath,
+        Project project,
+        IReadOnlyList<FieldPlacement> placements)
+    {
+        SetPlacementsCalls.Add((projectFolderPath, placements));
+        if (ExceptionToThrowOnSetPlacements is not null)
+        {
+            throw ExceptionToThrowOnSetPlacements;
+        }
+
+        return new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            project.Fields,
+            project.RowOverrides,
+            project.Template,
+            placements);
     }
 }

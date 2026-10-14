@@ -2,6 +2,7 @@ using CertificateGenerator.Core.Models;
 using CertificateGenerator.Tests.Fakes;
 using CertificateGenerator.Wpf.ViewModels;
 using CertificateGenerator.Core.Validators;
+using CertificateGenerator.Core.Interfaces;
 
 namespace CertificateGenerator.Tests.ViewModels;
 
@@ -14,14 +15,20 @@ public sealed class MainViewModelTests
             Array.Empty<IReadOnlyList<string>>());
     }
 
-    private static MainViewModel CreateViewModel(FakeValidator? validator = null)
+    private static MainViewModel CreateViewModel(
+        ITableReaderResolver? resolver = null,
+        FakeProjectStorage? storage = null,
+        FakeWindowNavigator? navigator = null,
+        FieldsViewModel? fields = null,
+        FakeValidator? validator = null)
     {
         return new MainViewModel(
-            new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
-            new FakeProjectStorage(),
-            new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator ?? new FakeValidator());
+            resolver ?? new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
+            storage ?? new FakeProjectStorage(),
+            navigator ?? new FakeWindowNavigator(),
+            fields ?? new FieldsViewModel(new FakeFieldEditDialogService()),
+            validator ?? new FakeValidator(),
+            new TemplateViewModel(new FakeTemplateStorage(), new FakeFilePicker()));
     }
 
     private static MainViewModel CreateViewModelWithOverride(
@@ -33,10 +40,7 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(resolver: resolver, storage: storage);
 
         var project = new Project(
             "A", DateTime.Now, "data.xlsx", Array.Empty<Field>(),
@@ -91,11 +95,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, 
-            new FakeWindowNavigator(), 
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -113,11 +115,9 @@ public sealed class MainViewModelTests
     {
         var storage = new FakeProjectStorage();
         var resolver = new FakeTableReaderResolver(new FakeTableReader(EmptyTable()));
-        var vm = new MainViewModel(
-            resolver, storage, 
-            new FakeWindowNavigator(), 
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         // Не вызываем Initialize — CurrentProject остаётся null.
         vm.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
@@ -135,11 +135,9 @@ public sealed class MainViewModelTests
                 new IOException("Файл занят другим процессом.")
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(EmptyTable()));
-        var vm = new MainViewModel(
-            resolver, storage, 
-            new FakeWindowNavigator(), 
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -162,11 +160,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, 
-            new FakeWindowNavigator(), 
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -202,12 +198,7 @@ public sealed class MainViewModelTests
     public void Initialize_DoesNotSaveProjectToStorage()
     {
         var storage = new FakeProjectStorage();
-        var vm = new MainViewModel(
-            new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
-            storage,
-            new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(storage: storage);
 
         var fields = new[] { new Field("Класс", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -227,12 +218,9 @@ public sealed class MainViewModelTests
             FieldToReturnOnCreate = new Field("Класс", FieldKind.Simple, new[] { 0 })
         };
 
-        var vm = new MainViewModel(
-            new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
-            storage,
-            new FakeWindowNavigator(),
-            new FieldsViewModel(dialog),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            storage: storage,
+            fields: new FieldsViewModel(dialog));
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -254,12 +242,9 @@ public sealed class MainViewModelTests
         {
             FieldToReturnOnCreate = new Field("Класс", FieldKind.Simple, new[] { 0 })
         };
-        var vm = new MainViewModel(
-            new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
-            storage,
-            new FakeWindowNavigator(),
-            new FieldsViewModel(dialog),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            storage: storage,
+            fields: new FieldsViewModel(dialog));
 
         var createdAt = new DateTime(2026, 1, 1);
         var project = new Project("A", createdAt, "data.xlsx", Array.Empty<Field>());
@@ -287,12 +272,9 @@ public sealed class MainViewModelTests
             FieldToReturnOnCreate = new Field("Класс", FieldKind.Simple, new[] { 0 })
         };
 
-        var vm = new MainViewModel(
-            new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
-            storage,
-            new FakeWindowNavigator(),
-            new FieldsViewModel(dialog),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            storage: storage,
+            fields: new FieldsViewModel(dialog));
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -318,10 +300,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -361,10 +342,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var fields = new[] { new Field("Класс", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -398,10 +378,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var fields = new[] { new Field("ФИО", FieldKind.FullName, new[] { 0, 1, 2 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -445,10 +424,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -475,10 +453,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(firstTable));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -496,10 +473,9 @@ public sealed class MainViewModelTests
                 (IReadOnlyList<string>)new[] { "Кузнецов" }
             });
         var resolver2 = new FakeTableReaderResolver(new FakeTableReader(secondTable));
-        var vm2 = new MainViewModel(
-            resolver2, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm2 = CreateViewModel(
+            resolver: resolver2,
+            storage: storage);
         vm2.Initialize(project, @"C:\Projects\A");
         vm2.LoadTableIntoProjectFromPath(@"C:\Temp\data.xlsx");
 
@@ -520,10 +496,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -544,10 +519,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -593,10 +567,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -624,10 +598,11 @@ public sealed class MainViewModelTests
         {
             FieldToReturnOnCreate = new Field("ФИО", FieldKind.Simple, new[] { 0 })
         };
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(dialog),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            fields: new FieldsViewModel(dialog),
+            validator: validator);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -654,10 +629,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -684,10 +659,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var project = new Project("A", DateTime.Now, string.Empty, Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -738,10 +713,11 @@ public sealed class MainViewModelTests
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
         var dialog = new FakeFieldEditDialogService();
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(dialog),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            fields: new FieldsViewModel(dialog),
+            validator: validator);
 
         // Поле добавляем через LoadFields — иначе диалог вернёт null.
         var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
@@ -776,10 +752,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -813,10 +789,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -850,10 +826,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -886,10 +862,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var fields = new[] { new Field("ФИО", FieldKind.Simple, new[] { 0 }) };
         var project = new Project("A", DateTime.Now, string.Empty, fields);
@@ -924,10 +900,10 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            validator);
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage,
+            validator: validator);
 
         var fields = new[]
         {
@@ -946,7 +922,7 @@ public sealed class MainViewModelTests
         Assert.Equal("6Б", vm.ValidationRows[1].Cells[1].Value);
     }
 
-        [Fact]
+    [Fact]
     public void Initialize_ProjectWithOverrides_AppliesThemToRows()
     {
         var table = new TableData(
@@ -962,10 +938,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project(
             "A", DateTime.Now, "data.xlsx",
@@ -993,10 +968,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project(
             "A", DateTime.Now, string.Empty,
@@ -1029,10 +1003,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -1058,10 +1031,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -1087,10 +1059,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -1120,10 +1091,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -1147,10 +1117,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");
@@ -1195,10 +1164,9 @@ public sealed class MainViewModelTests
             GetSourceTablePathToReturn = @"C:\Projects\A\source\data.xlsx"
         };
         var resolver = new FakeTableReaderResolver(new FakeTableReader(table));
-        var vm = new MainViewModel(
-            resolver, storage, new FakeWindowNavigator(),
-            new FieldsViewModel(new FakeFieldEditDialogService()),
-            new FakeValidator());
+        var vm = CreateViewModel(
+            resolver: resolver,
+            storage: storage);
 
         var project = new Project("A", DateTime.Now, "data.xlsx", Array.Empty<Field>());
         vm.Initialize(project, @"C:\Projects\A");

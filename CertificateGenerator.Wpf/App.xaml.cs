@@ -35,12 +35,14 @@ public partial class App : Application
         services.AddSingleton<IProjectStorage, JsonProjectStorage>();
         services.AddSingleton<IRecentProjectsStore, JsonRecentProjectsStore>();
         services.AddSingleton<ITableReaderResolver, TableReaderResolver>();
+        services.AddSingleton<ITemplateStorage, FileTemplateStorage>();
 
         // Валидация.
         services.AddSingleton<IValidator>(ProjectValidator.CreateDefault());
 
         // Wpf-сервисы.
         services.AddSingleton<IFolderPicker, WpfFolderPicker>();
+        services.AddSingleton<IFilePicker, WpfFilePicker>();  
         services.AddSingleton<ICreateProjectDialogService, CreateProjectDialogService>();
         services.AddSingleton<IWindowNavigator, WpfWindowNavigator>();
         services.AddSingleton<IFieldEditDialogService, FieldEditDialogService>();
@@ -50,6 +52,7 @@ public partial class App : Application
         services.AddTransient<ProjectViewModel>();
         services.AddTransient<MainViewModel>();
         services.AddTransient<FieldsViewModel>();
+        services.AddTransient<TemplateViewModel>();
 
         // Окна.
         services.AddTransient<StartupWindow>();

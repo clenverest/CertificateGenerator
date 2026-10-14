@@ -66,6 +66,11 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<ValidationRowViewModel> ValidationRows { get; } = new();
 
+    /// <summary>
+    /// ViewModel для работы с шаблоном грамоты.
+    /// </summary>
+    public TemplateViewModel Template { get; }
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool HasSummary => TableData is not null;
@@ -138,17 +143,20 @@ public sealed partial class MainViewModel : ObservableObject
         IProjectStorage projectStorage,
         IWindowNavigator navigator,
         FieldsViewModel fields,
-        IValidator validator)
+        IValidator validator,
+        TemplateViewModel template)
     {
         _tableReaderResolver = tableReaderResolver;
         _projectStorage = projectStorage;
         _navigator = navigator;
         Fields = fields;
         _validator = validator;
+        Template = template;
 
-        // Подписка — до любых изменений Fields,
-        // чтобы не потерять CollectionChanged.
+        // Подписки — до любых изменений,
+        // чтобы не потерять CollectionChanged / TemplateChanged.
         Fields.Fields.CollectionChanged += OnFieldsCollectionChanged;
+        Template.TemplateChanged += OnTemplateChanged;
     }
 
     /// <summary>
@@ -168,6 +176,9 @@ public sealed partial class MainViewModel : ObservableObject
         {
             _isLoadingFields = false;
         }
+
+        // Шаблон — до таблицы: он не зависит от неё.
+        Template.Initialize(project, projectFolderPath);
 
         TryLoadExistingTable();
         UpdateFieldPreviews();
@@ -199,6 +210,48 @@ public sealed partial class MainViewModel : ObservableObject
         // Превью и валидация обновляются в любом случае — даже при загрузке.
         UpdateFieldPreviews();
         RunValidation();
+    }
+
+    /// <summary>
+    /// Пользователь загрузил новый шаблон.
+    /// Сохраняем TemplateInfo в project.json.
+    /// </summary>
+    private void OnTemplateChanged(object? sender, TemplateInfo info)
+    {
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            return;
+        }
+
+        var updated = WithTemplate(info);
+
+        try
+        {
+            _projectStorage.Save(updated, ProjectFolderPath);
+            CurrentProject = updated;
+        }
+        catch (Exception ex)
+        {
+            Template.ErrorMessage = $"Не удалось сохранить шаблон: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Создать копию <see cref="CurrentProject"/> с новым шаблоном.
+    /// </summary>
+    private Project WithTemplate(TemplateInfo template)
+    {
+        var project = CurrentProject
+            ?? throw new InvalidOperationException("Проект не открыт.");
+
+        return new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            project.Fields,
+            project.RowOverrides,
+            template,
+            project.Placements);
     }
 
     /// <summary>
