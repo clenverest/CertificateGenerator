@@ -175,4 +175,110 @@ public sealed class ProjectTests
 
         Assert.Single(project.RowOverrides);
     }
+
+    // ---------------------------------------------------------------------
+    // Template и Placements
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void Create_WithoutTemplate_TemplateIsNull()
+    {
+        var project = new Project("Проект", DateTime.Now, "", Array.Empty<Field>());
+
+        Assert.Null(project.Template);
+    }
+
+    [Fact]
+    public void Create_WithoutPlacements_EmptyList()
+    {
+        var project = new Project("Проект", DateTime.Now, "", Array.Empty<Field>());
+
+        Assert.Empty(project.Placements);
+    }
+
+    [Fact]
+    public void Create_WithNullPlacements_EmptyList()
+    {
+        var project = new Project(
+            "Проект", DateTime.Now, "", Array.Empty<Field>(),
+            placements: null);
+
+        Assert.Empty(project.Placements);
+    }
+
+    [Fact]
+    public void Create_WithTemplate_StoresIt()
+    {
+        var template = new TemplateInfo("template.png", 2480, 3508);
+
+        var project = new Project(
+            "Проект", DateTime.Now, "", Array.Empty<Field>(),
+            template: template);
+
+        Assert.Same(template, project.Template);
+        Assert.Equal("template.png", project.Template!.FileName);
+        Assert.Equal(2480, project.Template.Width);
+        Assert.Equal(3508, project.Template.Height);
+    }
+
+    [Fact]
+    public void Create_WithPlacements_StoresThem()
+    {
+        var placements = new[]
+        {
+            new FieldPlacement("ФИО", 100, 200, 48, "Arial", FieldAlignment.Center),
+            new FieldPlacement("Класс", 100, 300, 32, "Arial", FieldAlignment.Left)
+        };
+
+        var project = new Project(
+            "Проект", DateTime.Now, "", Array.Empty<Field>(),
+            placements: placements);
+
+        Assert.Equal(2, project.Placements.Count);
+        Assert.Equal("ФИО", project.Placements[0].FieldName);
+        Assert.Equal("Класс", project.Placements[1].FieldName);
+    }
+
+    [Fact]
+    public void Create_CopiesPlacements()
+    {
+        // Если снаружи изменят список — Project не должен это увидеть.
+        var placements = new List<FieldPlacement>
+        {
+            new FieldPlacement("ФИО", 100, 200, 48, "Arial", FieldAlignment.Center)
+        };
+
+        var project = new Project(
+            "Проект", DateTime.Now, "", Array.Empty<Field>(),
+            placements: placements);
+
+        placements.Add(
+            new FieldPlacement("Класс", 100, 300, 32, "Arial", FieldAlignment.Left));
+
+        Assert.Single(project.Placements);
+    }
+
+    [Fact]
+    public void Create_WithAllOptionalParameters_StoresAll()
+    {
+        var template = new TemplateInfo("t.png", 100, 200);
+        var placements = new[]
+        {
+            new FieldPlacement("ФИО", 10, 20, 30, "Arial", FieldAlignment.Left)
+        };
+        var overrides = new[]
+        {
+            new RowOverride(0, new[] { "Иванов" })
+        };
+
+        var project = new Project(
+            "Полный", DateTime.Now, "data.xlsx", Array.Empty<Field>(),
+            rowOverrides: overrides,
+            template: template,
+            placements: placements);
+
+        Assert.Single(project.RowOverrides);
+        Assert.NotNull(project.Template);
+        Assert.Single(project.Placements);
+    }
 }

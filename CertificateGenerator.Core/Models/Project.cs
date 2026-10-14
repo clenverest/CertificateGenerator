@@ -33,6 +33,16 @@ public sealed class Project
     public IReadOnlyList<RowOverride> RowOverrides { get; }
 
     /// <summary>
+    /// Информация о PNG-шаблоне. <c>null</c>, если шаблон ещё не загружен.
+    /// </summary>
+    public TemplateInfo? Template { get; }
+
+    /// <summary>
+    /// Размещения полей на шаблоне. Пустой список, если размещений нет.
+    /// </summary>
+    public IReadOnlyList<FieldPlacement> Placements { get; }
+
+    /// <summary>
     /// Создать проект.
     /// </summary>
     /// <param name="name">Имя проекта.</param>
@@ -42,6 +52,10 @@ public sealed class Project
     /// <param name="fields">Список полей. Может быть пустым.</param>
     /// <param name="rowOverrides">Правки строк. Может быть <c>null</c> —
     /// тогда считается, что правок нет.</param>
+    /// <param name="template">Информация о PNG-шаблоне.
+    /// Может быть <c>null</c>, если шаблон ещё не загружен.</param>
+    /// <param name="placements">Размещения полей на шаблоне.
+    /// Может быть <c>null</c> — тогда считается, что размещений нет.</param>
     /// <exception cref="ArgumentException">
     /// Бросается, если имя проекта пусто.
     /// </exception>
@@ -54,7 +68,9 @@ public sealed class Project
         DateTime createdAt,
         string sourceFileName,
         IReadOnlyList<Field> fields,
-        IReadOnlyList<RowOverride>? rowOverrides = null)
+        IReadOnlyList<RowOverride>? rowOverrides = null,
+        TemplateInfo? template = null,
+        IReadOnlyList<FieldPlacement>? placements = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -75,6 +91,8 @@ public sealed class Project
         CreatedAt = createdAt;
         SourceFileName = sourceFileName;
         Fields = fields;
-        RowOverrides = rowOverrides?.ToArray() ?? Array.Empty<RowOverride>();    
+        RowOverrides = rowOverrides?.ToArray() ?? Array.Empty<RowOverride>();
+        Template = template;
+        Placements = placements?.ToArray() ?? Array.Empty<FieldPlacement>();
     }
 }
