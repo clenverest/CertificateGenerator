@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:CertificateGenerator.Wpf"
         xmlns:models="clr-namespace:CertificateGenerator.Core.Models;assembly=CertificateGenerator.Core"
+        xmlns:converters="clr-namespace:CertificateGenerator.Wpf.Converters"
         Title="CertificateGenerator"
         Height="700"
         Width="1200"
@@ -12,6 +13,7 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <converters:ByteArrayToBitmapImageConverter x:Key="ByteArrayToBitmapImage" />
     </Window.Resources>
 
     <Grid Margin="12">
@@ -325,6 +327,165 @@
                             </Style>
                         </DataGrid.CellStyle>
                     </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Вкладка «Шаблон» -->
+            <TabItem Header="Шаблон">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Кнопки + путь -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Загрузить PNG-шаблон"
+                                    Command="{Binding Template.LoadTemplateCommand}"
+                                    Background="#0078D4"
+                                    Foreground="White"
+                                    Padding="16,8"
+                                    FontSize="14"
+                                    BorderThickness="0"
+                                    Cursor="Hand" />
+
+                            <Button Content="Заменить шаблон"
+                                    Command="{Binding Template.LoadTemplateCommand}"
+                                    Margin="8,0,0,0"
+                                    Padding="16,8"
+                                    FontSize="14"
+                                    Background="#F3F3F3"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Visibility="{Binding Template.HasTemplate, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding Template.TemplatePath}"
+                                   Foreground="#605E5C"
+                                   FontSize="12"
+                                   Margin="0,8,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding Template.HasTemplate, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+
+                    <!-- Панель зума -->
+                    <Border Grid.Row="1"
+                            Padding="8,6"
+                            Margin="0,4,0,8"
+                            Background="#F8F8F8"
+                            CornerRadius="4"
+                            Visibility="{Binding Template.HasTemplate, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Масштаб:"
+                                       FontSize="12"
+                                       Foreground="#605E5C"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+
+                            <Button Content="−"
+                                    Command="{Binding Template.ZoomOutCommand}"
+                                    Width="28"
+                                    Height="28"
+                                    Padding="0"
+                                    FontSize="16"
+                                    Background="#F3F3F3"
+                                    BorderThickness="0"
+                                    Cursor="Hand" />
+
+                            <Slider Value="{Binding Template.ZoomLevel, Mode=TwoWay}"
+                                    Minimum="0.1"
+                                    Maximum="4.0"
+                                    Width="200"
+                                    Margin="8,0,8,0"
+                                    VerticalAlignment="Center"
+                                    IsSnapToTickEnabled="False" />
+
+                            <Button Content="+"
+                                    Command="{Binding Template.ZoomInCommand}"
+                                    Width="28"
+                                    Height="28"
+                                    Padding="0"
+                                    FontSize="16"
+                                    Background="#F3F3F3"
+                                    BorderThickness="0"
+                                    Cursor="Hand" />
+
+                            <Button Content="100%"
+                                    Command="{Binding Template.ResetZoomCommand}"
+                                    Margin="12,0,0,0"
+                                    Padding="10,4"
+                                    FontSize="12"
+                                    Background="#F3F3F3"
+                                    BorderThickness="0"
+                                    Cursor="Hand" />
+
+                            <TextBlock FontSize="12"
+                                       Foreground="#605E5C"
+                                       VerticalAlignment="Center"
+                                       Margin="12,0,0,0">
+                                <TextBlock.Text>
+                                    <Binding Path="Template.ZoomLevel"
+                                             StringFormat="{}{0:P0}" />
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Плашка ошибки вкладки «Шаблон» -->
+                    <Border Grid.Row="2"
+                            Background="#FDE7E9"
+                            BorderBrush="#C42B1C"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="12,8"
+                            Margin="0,0,0,12"
+                            Visibility="{Binding Template.HasError, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding Template.ErrorMessage}"
+                                   Foreground="#C42B1C"
+                                   FontSize="13"
+                                   TextWrapping="Wrap" />
+                    </Border>
+
+                    <!-- Превью шаблона -->
+                    <Border Grid.Row="3"
+                            BorderBrush="#E0E0E0"
+                            BorderThickness="1"
+                            Background="White">
+                        <Grid>
+                            <!-- Заглушка: шаблон не загружен -->
+                            <TextBlock Text="Шаблон не загружен"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="16"
+                                       Foreground="#605E5C">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Template.HasTemplate}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!-- Картинка шаблона с масштабом и прокруткой -->
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalContentAlignment="Center"
+                                          VerticalContentAlignment="Center"
+                                          Visibility="{Binding Template.HasTemplate, Converter={StaticResource BoolToVisibility}}">
+                                <Image Source="{Binding Template.PreviewImage, Converter={StaticResource ByteArrayToBitmapImage}}"
+                                       Width="{Binding Template.ScaledWidth}"
+                                       Height="{Binding Template.ScaledHeight}"
+                                       Stretch="Fill" />
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
                 </Grid>
             </TabItem>
         </TabControl>

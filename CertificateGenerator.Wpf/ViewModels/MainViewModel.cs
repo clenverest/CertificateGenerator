@@ -157,6 +157,7 @@ public sealed partial class MainViewModel : ObservableObject
         // чтобы не потерять CollectionChanged / TemplateChanged.
         Fields.Fields.CollectionChanged += OnFieldsCollectionChanged;
         Template.TemplateChanged += OnTemplateChanged;
+        Template.PlacementsChanged += OnPlacementsChanged;
     }
 
     /// <summary>
@@ -179,6 +180,9 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Шаблон — до таблицы: он не зависит от неё.
         Template.Initialize(project, projectFolderPath);
+
+        // Согласовать размещения с полями проекта.
+        Template.SyncFields(project.Fields);
 
         TryLoadExistingTable();
         UpdateFieldPreviews();
@@ -210,6 +214,12 @@ public sealed partial class MainViewModel : ObservableObject
         // Превью и валидация обновляются в любом случае — даже при загрузке.
         UpdateFieldPreviews();
         RunValidation();
+
+        // Согласовать размещения: если поле удалено — убрать его placement.
+        if (CurrentProject is not null)
+        {
+            Template.SyncFields(Fields.GetFieldsSnapshot());
+        }
     }
 
     /// <summary>
@@ -234,6 +244,47 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Template.ErrorMessage = $"Не удалось сохранить шаблон: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Размещения полей изменились. Сохраняем в project.json.
+    /// </summary>
+    private void OnPlacementsChanged(object? sender, EventArgs e)
+    {
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            return;
+        }
+
+        var updated = WithPlacements(Template.GetPlacementsSnapshot());
+
+        try
+        {
+            _projectStorage.Save(updated, ProjectFolderPath);
+            CurrentProject = updated;
+        }
+        catch (Exception ex)
+        {
+            Template.ErrorMessage = $"Не удалось сохранить размещения: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Создать копию <see cref="CurrentProject"/> с новым списком размещений.
+    /// </summary>
+    private Project WithPlacements(IReadOnlyList<FieldPlacement> placements)
+    {
+        var project = CurrentProject
+            ?? throw new InvalidOperationException("Проект не открыт.");
+
+        return new Project(
+            project.Name,
+            project.CreatedAt,
+            project.SourceFileName,
+            project.Fields,
+            project.RowOverrides,
+            project.Template,
+            placements);
     }
 
     /// <summary>
