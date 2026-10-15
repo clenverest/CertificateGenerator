@@ -20,6 +20,8 @@ public sealed partial class TemplateViewModel : ObservableObject
 
     private string? _projectFolderPath;
 
+    private IReadOnlyList<Field> _allFields = Array.Empty<Field>();
+
     /// <summary>Минимальный масштаб отображения — 10%.</summary>
     private const double MinZoom = 0.1;
 
@@ -69,7 +71,14 @@ public sealed partial class TemplateViewModel : ObservableObject
     /// Выбранное размещение. Панель настройки привязана к нему.
     /// </summary>
     [ObservableProperty]
-    private FieldPlacementViewModel? _selectedPlacement;   
+    private FieldPlacementViewModel? _selectedPlacement;  
+
+
+    /// <summary>
+    /// Выбранная строка списка полей.
+    /// </summary>
+    [ObservableProperty]
+    private FieldRowViewModel? _selectedFieldRow;
 
     /// <summary>
     /// Есть ли загруженный шаблон.
@@ -101,6 +110,12 @@ public sealed partial class TemplateViewModel : ObservableObject
     /// и настройками отображения.
     /// </summary>
     public ObservableCollection<FieldPlacementViewModel> Placements { get; } = new();
+
+
+    /// <summary>
+    /// Строки списка полей для UI вкладки «Шаблон».
+    /// </summary>
+    public ObservableCollection<FieldRowViewModel> FieldRows { get; } = new();
 
     /// <summary>
     /// Можно ли увеличить масштаб.
@@ -219,7 +234,10 @@ public sealed partial class TemplateViewModel : ObservableObject
 
         foreach (var model in placements)
         {
-            var vm = new FieldPlacementViewModel(model);
+            var vm = new FieldPlacementViewModel(model)
+            {
+                ZoomLevel = ZoomLevel
+            };
             vm.Changed += OnPlacementViewModelChanged;
             Placements.Add(vm);
         }
@@ -238,6 +256,8 @@ public sealed partial class TemplateViewModel : ObservableObject
         {
             throw new ArgumentNullException(nameof(fields));
         }
+
+        _allFields = fields;
 
         var fieldNames = new HashSet<string>(
             fields.Select(f => f.Name),
@@ -260,9 +280,36 @@ public sealed partial class TemplateViewModel : ObservableObject
             SelectedPlacement = null;
         }
 
+        // Пересобираем строки списка полей.
+        RebuildFieldRows();
+
         if (toRemove.Count > 0)
         {
             RaisePlacementsChanged();
+        }
+    }
+
+    /// <summary>
+    /// Пересобрать список строк полей из актуальных полей и размещений.
+    /// </summary>
+    private void RebuildFieldRows()
+    {
+        FieldRows.Clear();
+
+        foreach (var field in _allFields)
+        {
+            var row = new FieldRowViewModel(field)
+            {
+                Placement = GetPlacement(field)
+            };
+
+            FieldRows.Add(row);
+        }
+
+        // Если выбранная строка исчезла — сбрасываем.
+        if (SelectedFieldRow is not null && !FieldRows.Contains(SelectedFieldRow))
+        {
+            SelectedFieldRow = null;
         }
     }
 
@@ -323,13 +370,58 @@ public sealed partial class TemplateViewModel : ObservableObject
             DefaultFontFamily,
             DefaultAlignment);
 
-        var vm = new FieldPlacementViewModel(model);
+        var vm = new FieldPlacementViewModel(model)
+        {
+            ZoomLevel = ZoomLevel
+        };
         vm.Changed += OnPlacementViewModelChanged;
         Placements.Add(vm);
+
+        // Обновляем строку списка, соответствующую полю.
+        var row = FieldRows.FirstOrDefault(r =>
+            string.Equals(r.Field.Name, field.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (row is not null)
+        {
+            row.Placement = vm;
+            SelectedFieldRow = row;
+        }
 
         SelectedPlacement = vm;
 
         RaisePlacementsChanged();
+    }
+
+    /// <summary>
+    /// Выбрать размещение. Синхронизирует SelectedPlacement и SelectedFieldRow.
+    /// </summary>
+    public void SelectPlacement(FieldPlacementViewModel placement)
+    {
+        if (placement is null)
+        {
+            throw new ArgumentNullException(nameof(placement));
+        }
+
+        if (!Placements.Contains(placement))
+        {
+            return;
+        }
+
+        // Находим строку, соответствующую placement.
+        var row = FieldRows.FirstOrDefault(r =>
+            string.Equals(r.Field.Name, placement.FieldName, StringComparison.OrdinalIgnoreCase));
+
+        if (row is not null)
+        {
+            // Устанавливаем SelectedFieldRow — он в свою очередь установит SelectedPlacement
+            // через OnSelectedFieldRowChanged.
+            SelectedFieldRow = row;
+        }
+        else
+        {
+            // Строки нет (поле удалено) — устанавливаем только SelectedPlacement.
+            SelectedPlacement = placement;
+        }
     }
 
     /// <summary>
@@ -346,6 +438,15 @@ public sealed partial class TemplateViewModel : ObservableObject
 
         if (Placements.Remove(placement))
         {
+            // Обновляем строку списка, если она была привязана к этому placement.
+            var row = FieldRows.FirstOrDefault(r =>
+                ReferenceEquals(r.Placement, placement));
+
+            if (row is not null)
+            {
+                row.Placement = null;
+            }
+
             if (ReferenceEquals(SelectedPlacement, placement))
             {
                 SelectedPlacement = null;
@@ -482,6 +583,12 @@ public sealed partial class TemplateViewModel : ObservableObject
         OnPropertyChanged(nameof(ScaledHeight));
         OnPropertyChanged(nameof(CanZoomIn));
         OnPropertyChanged(nameof(CanZoomOut));
+
+        // Пробрасываем масштаб во все маркеры.
+        foreach (var placement in Placements)
+        {
+            placement.ZoomLevel = value;
+        }
     }
 
     partial void OnErrorMessageChanged(string? value)
@@ -489,8 +596,25 @@ public sealed partial class TemplateViewModel : ObservableObject
         OnPropertyChanged(nameof(HasError));
     }
 
-    partial void OnSelectedPlacementChanged(FieldPlacementViewModel? value)
+    partial void OnSelectedPlacementChanged(FieldPlacementViewModel? oldValue, FieldPlacementViewModel? newValue)
     {
+        if (oldValue is not null)
+        {
+            oldValue.IsSelected = false;
+        }
+
+        if (newValue is not null)
+        {
+            newValue.IsSelected = true;
+        }
+
         OnPropertyChanged(nameof(HasSelectedPlacement));
     }
+
+    partial void OnSelectedFieldRowChanged(FieldRowViewModel? value)
+    {
+        // Связь односторонняя: строка → размещение.
+        // Обратно устанавливаем вручную (в AddPlacementForField).
+        SelectedPlacement = value?.Placement;
+    }    
 }

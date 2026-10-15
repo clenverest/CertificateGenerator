@@ -338,6 +338,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- Кнопки + путь -->
@@ -387,10 +388,8 @@
 
                             <Button Content="−"
                                     Command="{Binding Template.ZoomOutCommand}"
-                                    Width="28"
-                                    Height="28"
-                                    Padding="0"
-                                    FontSize="16"
+                                    Width="28" Height="28"
+                                    Padding="0" FontSize="16"
                                     Background="#F3F3F3"
                                     BorderThickness="0"
                                     Cursor="Hand" />
@@ -405,10 +404,8 @@
 
                             <Button Content="+"
                                     Command="{Binding Template.ZoomInCommand}"
-                                    Width="28"
-                                    Height="28"
-                                    Padding="0"
-                                    FontSize="16"
+                                    Width="28" Height="28"
+                                    Padding="0" FontSize="16"
                                     Background="#F3F3F3"
                                     BorderThickness="0"
                                     Cursor="Hand" />
@@ -449,45 +446,299 @@
                                    TextWrapping="Wrap" />
                     </Border>
 
-                    <!-- Превью шаблона -->
-                    <Border Grid.Row="3"
+                    <!-- Основная область: список полей + шаблон -->
+                    <Grid Grid.Row="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="260" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Левая колонка: список полей -->
+                        <Border Grid.Column="0"
+                                BorderBrush="#E0E0E0"
+                                BorderThickness="1"
+                                Background="White"
+                                Margin="0,0,12,0">
+                            <Grid Margin="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Text="Поля на шаблоне"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="#0078D4"
+                                           Margin="0,0,0,8" />
+
+                                <ListBox Grid.Row="1"
+                                         ItemsSource="{Binding Template.FieldRows}"
+                                         SelectedItem="{Binding Template.SelectedFieldRow, Mode=TwoWay}"
+                                         BorderBrush="#E0E0E0"
+                                         BorderThickness="1"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="4,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="20" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Индикатор: галочка или точка -->
+                                                <TextBlock Grid.Column="0"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="12">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="·" />
+                                                            <Setter Property="Foreground" Value="#A0A0A0" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasPlacement}" Value="True">
+                                                                    <Setter Property="Text" Value="✓" />
+                                                                    <Setter Property="Foreground" Value="#107C10" />
+                                                                    <Setter Property="FontWeight" Value="Bold" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               FontSize="13"
+                                                               FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding KindLabel}"
+                                                               FontSize="11"
+                                                               Foreground="#605E5C"
+                                                               Margin="0,2,0,0" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <!-- Кнопка «Разместить поле» -->
+                                <Button Grid.Row="2"
+                                        Content="Разместить поле"
+                                        Click="OnPlaceFieldClick"
+                                        Margin="0,8,0,0"
+                                        Padding="10,6"
+                                        Background="#0078D4"
+                                        Foreground="White"
+                                        BorderThickness="0"
+                                        Cursor="Hand">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="IsEnabled" Value="False" />
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Template.HasTemplate}" Value="True" />
+                                                        <Condition Binding="{Binding Template.SelectedFieldRow.HasPlacement}" Value="False" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="IsEnabled" Value="True" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- Правая колонка: шаблон -->
+                        <Border Grid.Column="1"
+                                BorderBrush="#E0E0E0"
+                                BorderThickness="1"
+                                Background="White">
+                            <Grid>
+                                <!-- Заглушка -->
+                                <TextBlock Text="Шаблон не загружен"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="16"
+                                           Foreground="#605E5C">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Template.HasTemplate}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Картинка + маркеры полей -->
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalContentAlignment="Center"
+                                              VerticalContentAlignment="Center"
+                                              Visibility="{Binding Template.HasTemplate, Converter={StaticResource BoolToVisibility}}">
+                                    <Canvas Width="{Binding Template.ScaledWidth}"
+                                            Height="{Binding Template.ScaledHeight}">
+                                        <!-- Картинка шаблона -->
+                                        <Image Source="{Binding Template.PreviewImage, Converter={StaticResource ByteArrayToBitmapImage}}"
+                                               Width="{Binding Template.ScaledWidth}"
+                                               Height="{Binding Template.ScaledHeight}"
+                                               Stretch="Fill" />
+
+                                        <!-- Маркеры размещений -->
+                                        <ItemsControl Width="{Binding Template.ScaledWidth}"
+                                                      Height="{Binding Template.ScaledHeight}"
+                                                      ItemsSource="{Binding Template.Placements}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <Canvas />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+
+                                            <ItemsControl.ItemContainerStyle>
+                                                <Style TargetType="ContentPresenter">
+                                                    <Setter Property="Canvas.Left" Value="{Binding DisplayX}" />
+                                                    <Setter Property="Canvas.Top" Value="{Binding DisplayY}" />
+                                                </Style>
+                                            </ItemsControl.ItemContainerStyle>
+
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Click="OnPlacementMarkerClick"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Padding="0"
+                                                            Cursor="Hand"
+                                                            HorizontalContentAlignment="Left"
+                                                            VerticalContentAlignment="Top">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <ContentPresenter />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <!-- Маркер -->
+                                                            <Ellipse VerticalAlignment="Top">
+                                                                <Ellipse.Style>
+                                                                    <Style TargetType="Ellipse">
+                                                                        <Setter Property="Width" Value="10" />
+                                                                        <Setter Property="Height" Value="10" />
+                                                                        <Setter Property="Fill" Value="#800078D4" />
+                                                                        <Setter Property="Margin" Value="-5,-5,0,0" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                <Setter Property="Width" Value="16" />
+                                                                                <Setter Property="Height" Value="16" />
+                                                                                <Setter Property="Margin" Value="-8,-8,0,0" />
+                                                                                <Setter Property="Fill" Value="#0078D4" />
+                                                                                <Setter Property="Stroke" Value="White" />
+                                                                                <Setter Property="StrokeThickness" Value="2" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Ellipse.Style>
+                                                            </Ellipse>
+
+                                                            <!-- Подпись -->
+                                                            <TextBlock Text="{Binding FieldName}"
+                                                                       FontSize="11"
+                                                                       VerticalAlignment="Top"
+                                                                       Margin="4,-9,0,0">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="#605E5C" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                <Setter Property="Foreground" Value="#0078D4" />
+                                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Canvas>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Панель настройки выбранного размещения -->
+                    <Border Grid.Row="4"
+                            Margin="0,12,0,0"
+                            Padding="12"
+                            Background="#FAFAFA"
                             BorderBrush="#E0E0E0"
                             BorderThickness="1"
-                            Background="White">
-                        <Grid>
-                            <!-- Заглушка: шаблон не загружен -->
-                            <TextBlock Text="Шаблон не загружен"
-                                       HorizontalAlignment="Center"
+                            Visibility="{Binding Template.HasSelectedPlacement, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="X:"
                                        VerticalAlignment="Center"
-                                       FontSize="16"
-                                       Foreground="#605E5C">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Template.HasTemplate}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                       Margin="0,0,4,0"
+                                       Foreground="#605E5C" />
+                            <TextBox Width="60"
+                                     Padding="4,2"
+                                     VerticalAlignment="Center"
+                                     Text="{Binding Template.SelectedPlacement.X, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <!-- Картинка шаблона с масштабом и прокруткой -->
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalContentAlignment="Center"
-                                          VerticalContentAlignment="Center"
-                                          Visibility="{Binding Template.HasTemplate, Converter={StaticResource BoolToVisibility}}">
-                                <Image Source="{Binding Template.PreviewImage, Converter={StaticResource ByteArrayToBitmapImage}}"
-                                       Width="{Binding Template.ScaledWidth}"
-                                       Height="{Binding Template.ScaledHeight}"
-                                       Stretch="Fill" />
-                            </ScrollViewer>
-                        </Grid>
+                            <TextBlock Text="Y:"
+                                       VerticalAlignment="Center"
+                                       Margin="16,0,4,0"
+                                       Foreground="#605E5C" />
+                            <TextBox Width="60"
+                                     Padding="4,2"
+                                     VerticalAlignment="Center"
+                                     Text="{Binding Template.SelectedPlacement.Y, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Text="Размер:"
+                                       VerticalAlignment="Center"
+                                       Margin="16,0,4,0"
+                                       Foreground="#605E5C" />
+                            <TextBox Width="60"
+                                     Padding="4,2"
+                                     VerticalAlignment="Center"
+                                     Text="{Binding Template.SelectedPlacement.FontSize, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Text="Выравнивание:"
+                                       VerticalAlignment="Center"
+                                       Margin="16,0,4,0"
+                                       Foreground="#605E5C" />
+                            <ComboBox Width="140"
+                                      Padding="4,2"
+                                      VerticalAlignment="Center"
+                                      ItemsSource="{Binding Source={x:Static local:MainWindow.AlignmentOptions}}"
+                                      SelectedValue="{Binding Template.SelectedPlacement.Alignment, Mode=TwoWay}"
+                                      SelectedValuePath="Value"
+                                      DisplayMemberPath="Label" />
+
+                            <TextBlock Text="Шрифт:"
+                                       VerticalAlignment="Center"
+                                       Margin="16,0,4,0"
+                                       Foreground="#605E5C" />
+                            <ComboBox Width="160"
+                                      Padding="4,2"
+                                      VerticalAlignment="Center"
+                                      ItemsSource="{Binding Source={x:Static local:MainWindow.AvailableFonts}}"
+                                      SelectedItem="{Binding Template.SelectedPlacement.FontFamily, Mode=TwoWay}" />
+
+                            <Button Content="Удалить размещение"
+                                    Click="OnRemovePlacementClick"
+                                    Margin="16,0,0,0"
+                                    Padding="10,6"
+                                    VerticalAlignment="Center"
+                                    Background="#F3F3F3"
+                                    BorderThickness="0"
+                                    Cursor="Hand" />
+                        </StackPanel>
                     </Border>
                 </Grid>
-            </TabItem>
+            </TabItem>    
         </TabControl>
     </Grid>
 </Window>

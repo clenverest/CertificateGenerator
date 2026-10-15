@@ -1,8 +1,11 @@
-﻿using System.Collections.Specialized;
+﻿using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using CertificateGenerator.Core.Models;
 using CertificateGenerator.Wpf.ViewModels;
 
@@ -11,6 +14,25 @@ namespace CertificateGenerator.Wpf;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+
+    /// <summary>
+    /// Варианты выравнивания для ComboBox. XAML биндится сюда.
+    /// </summary>
+    public static IReadOnlyList<AlignmentOption> AlignmentOptions { get; } = new[]
+    {
+        new AlignmentOption(FieldAlignment.Left, "По левому краю"),
+        new AlignmentOption(FieldAlignment.Center, "По центру"),
+        new AlignmentOption(FieldAlignment.Right, "По правому краю")
+    };
+
+    /// <summary>
+    /// Доступные системные шрифты для ComboBox.
+    /// </summary>
+    public static IReadOnlyList<string> AvailableFonts { get; } =
+        Fonts.SystemFontFamilies
+            .Select(f => f.Source)
+            .OrderBy(s => s)
+            .ToList();
 
     public MainWindow(MainViewModel viewModel)
     {
@@ -24,6 +46,11 @@ public partial class MainWindow : Window
 
         DataContext = _viewModel;
     }
+
+    /// <summary>
+    /// Пара «значение — подпись» для ComboBox выравнивания.
+    /// </summary>
+    public sealed record AlignmentOption(FieldAlignment Value, string Label);
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -98,5 +125,42 @@ public partial class MainWindow : Window
         }
 
         ValidationGrid.ItemsSource = _viewModel.ValidationRows;
+    }
+
+        private void OnPlaceFieldClick(object sender, RoutedEventArgs e)
+    {
+        var row = _viewModel.Template.SelectedFieldRow;
+        if (row is null || row.HasPlacement)
+        {
+            return;
+        }
+
+        _viewModel.Template.AddPlacementForField(row.Field);
+    }
+
+    private void OnRemovePlacementClick(object sender, RoutedEventArgs e)
+    {
+        var placement = _viewModel.Template.SelectedPlacement;
+        if (placement is null)
+        {
+            return;
+        }
+
+        _viewModel.Template.RemovePlacement(placement);
+    }
+
+    private void OnPlacementMarkerClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button)
+        {
+            return;
+        }
+
+        if (button.DataContext is not FieldPlacementViewModel placement)
+        {
+            return;
+        }
+
+        _viewModel.Template.SelectPlacement(placement);
     }
 }

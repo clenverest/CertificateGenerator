@@ -110,4 +110,87 @@ public sealed class FieldPlacementViewModelTests
 
         Assert.False(raised);
     }
+
+        // ---------------------------------------------------------------------
+    // Zoom / DisplayX / DisplayY / IsSelected
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public void ZoomLevel_DefaultIsOne()
+    {
+        var vm = new FieldPlacementViewModel(Sample());
+
+        Assert.Equal(1.0, vm.ZoomLevel);
+    }
+
+    [Fact]
+    public void DisplayX_Default_EqualsX()
+    {
+        var vm = new FieldPlacementViewModel(Sample());
+
+        Assert.Equal(100, vm.DisplayX);
+    }
+
+    [Fact]
+    public void DisplayY_Default_EqualsY()
+    {
+        var vm = new FieldPlacementViewModel(Sample());
+
+        Assert.Equal(200, vm.DisplayY);
+    }
+
+    [Fact]
+    public void DisplayX_WithZoom_Scales()
+    {
+        var vm = new FieldPlacementViewModel(Sample());
+
+        vm.ZoomLevel = 2.0;
+
+        Assert.Equal(200, vm.DisplayX);
+        Assert.Equal(400, vm.DisplayY);
+    }
+
+    [Fact]
+    public void DisplayX_UpdatesWhenXChanges()
+    {
+        var vm = new FieldPlacementViewModel(Sample());
+        vm.ZoomLevel = 2.0;
+
+        vm.X = 50;
+
+        Assert.Equal(100, vm.DisplayX);  // 50 * 2
+    }
+
+    [Fact]
+    public void ZoomLevelChange_DoesNotRaiseChanged()
+    {
+        // Зум — UI-состояние, не сохраняется в project.json.
+        var vm = new FieldPlacementViewModel(Sample());
+        var raised = false;
+        vm.Changed += (_, _) => raised = true;
+
+        vm.ZoomLevel = 2.0;
+
+        Assert.False(raised);
+    }
+
+    [Fact]
+    public void IsSelectedChange_DoesNotRaiseChanged()
+    {
+        var vm = new FieldPlacementViewModel(Sample());
+        var raised = false;
+        vm.Changed += (_, _) => raised = true;
+
+        vm.IsSelected = true;
+
+        Assert.False(raised);
+    }
+
+    [Fact]
+    public void IsSelected_DefaultIsFalse()
+    {
+        var vm = new FieldPlacementViewModel(Sample());
+
+        Assert.False(vm.IsSelected);
+    }
 }

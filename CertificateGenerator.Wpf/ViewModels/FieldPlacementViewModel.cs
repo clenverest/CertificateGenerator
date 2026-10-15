@@ -19,10 +19,12 @@ public sealed partial class FieldPlacementViewModel : ObservableObject
 
     /// <summary>Координата X в пикселях исходного шаблона.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayX))]
     private int _x;
 
     /// <summary>Координата Y в пикселях исходного шаблона.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayY))]
     private int _y;
 
     /// <summary>Размер шрифта в пикселях.</summary>
@@ -38,6 +40,31 @@ public sealed partial class FieldPlacementViewModel : ObservableObject
     private FieldAlignment _alignment;
 
     /// <summary>
+    /// Масштаб отображения шаблона. Влияет на DisplayX/DisplayY.
+    /// Синхронизируется из TemplateViewModel.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayX))]
+    [NotifyPropertyChangedFor(nameof(DisplayY))]
+    private double _zoomLevel = 1.0;
+
+    /// <summary>
+    /// Выбрано ли это размещение. Управляет видом маркера.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSelected;
+
+    /// <summary>
+    /// Координата X для отображения (с учётом масштаба).
+    /// </summary>
+    public double DisplayX => X * ZoomLevel;
+
+    /// <summary>
+    /// Координата Y для отображения (с учётом масштаба).
+    /// </summary>
+    public double DisplayY => Y * ZoomLevel;
+
+    /// <summary>
     /// Событие: любое свойство размещения изменилось.
     /// Используется для автосохранения.
     /// </summary>
@@ -47,10 +74,8 @@ public sealed partial class FieldPlacementViewModel : ObservableObject
     {
         _model = model ?? throw new ArgumentNullException(nameof(model));
 
-        // Инициализируем observable-свойства значениями из модели.
-        // Внимание: это вызовет partial-методы и Changed — надо подавить.
-        // Проще: присваиваем напрямую поля через SetProperty, но с флагом.
-
+        // Присваиваем поля напрямую — partial-методы не вызовутся,
+        // Changed не сработает до подписки.
         _x = model.X;
         _y = model.Y;
         _fontSize = model.FontSize;
