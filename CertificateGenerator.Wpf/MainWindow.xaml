@@ -60,6 +60,16 @@
                         BorderThickness="0"
                         Cursor="Hand" />
 
+                <Button Content="Сгенерировать PDF"
+                        Command="{Binding GeneratePdfCommand}"
+                        Margin="8,0,0,0"
+                        Padding="16,8"
+                        FontSize="14"
+                        Background="#107C10"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Cursor="Hand" />
+
                 <StackPanel Orientation="Horizontal"
                             Margin="16,0,0,0"
                             VerticalAlignment="Center"
@@ -88,6 +98,19 @@
                        FontWeight="SemiBold"
                        Margin="0,4,0,0"
                        Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}" />
+
+            <Border Margin="0,8,0,0"
+                    Padding="12,8"
+                    Background="#E6F4EA"
+                    BorderBrush="#107C10"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Visibility="{Binding HasPdfStatus, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding PdfStatusMessage}"
+                        Foreground="#107C10"
+                        FontSize="13"
+                        TextWrapping="Wrap" />
+            </Border>
         </StackPanel>
 
         <!-- Плашка ошибки -->
@@ -123,8 +146,9 @@
                               IsReadOnly="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
-                              SelectionUnit="Cell"
+                              SelectionUnit="FullRow"
                               SelectionMode="Single"
+                              SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
                               Background="White"

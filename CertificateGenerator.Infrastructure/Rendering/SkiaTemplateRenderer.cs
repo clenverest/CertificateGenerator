@@ -97,11 +97,16 @@ public sealed class SkiaTemplateRenderer : ITemplateRenderer
         // Ширина текста — нужна для Center и Right.
         var textWidth = font.MeasureText(value);
 
+        // Эффективный X: если «по центру шаблона» — игнорируем placement.X.
+        var effectiveX = placement.IsCenteredHorizontally
+            ? bitmap.Width / 2f
+            : placement.X;
+
         var drawX = placement.Alignment switch
         {
-            FieldAlignment.Center => placement.X - textWidth / 2f,
-            FieldAlignment.Right => placement.X - textWidth,
-            _ => placement.X
+            FieldAlignment.Center => effectiveX - textWidth / 2f,
+            FieldAlignment.Right => effectiveX - textWidth,
+            _ => effectiveX
         };
 
         // SkiaSharp рисует от базовой линии. Наш Y — верхний край текста.
