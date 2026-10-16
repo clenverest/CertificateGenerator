@@ -106,7 +106,9 @@ public sealed class FakeProjectStorage : IProjectStorage
             project.CreatedAt,
             fileName,
             project.Fields,
-            project.RowOverrides);
+            project.RowOverrides,
+            project.Template, 
+            project.Placements);
     }
 
     public string? GetSourceTablePath(Project project, string projectFolderPath)

@@ -185,7 +185,9 @@ public sealed class JsonProjectStorage : IProjectStorage
             project.CreatedAt,
             fileName,
             project.Fields,
-            project.RowOverrides);
+            project.RowOverrides,
+            project.Template, 
+            project.Placements);
 
         Save(updated, projectFolderPath);
 
