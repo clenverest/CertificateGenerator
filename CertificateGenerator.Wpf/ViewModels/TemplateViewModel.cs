@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows.Threading;
 using CertificateGenerator.Core.Interfaces;
 using CertificateGenerator.Core.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -17,10 +18,23 @@ public sealed partial class TemplateViewModel : ObservableObject
 {
     private readonly ITemplateStorage _templateStorage;
     private readonly IFilePicker _filePicker;
+    private readonly ITemplateRenderer _templateRenderer;
 
     private string? _projectFolderPath;
 
     private IReadOnlyList<Field> _allFields = Array.Empty<Field>();
+
+    /// <summary>
+    /// Значения полей для превью. Устанавливаются из MainViewModel.
+    /// </summary>
+    private IReadOnlyDictionary<string, string> _fieldValues =
+        new Dictionary<string, string>();
+
+    /// <summary>
+    /// Таймер отложенного обновления превью. Перезапускается
+    /// при каждом изменении, срабатывает через 200 мс.
+    /// </summary>
+    private readonly DispatcherTimer _previewTimer;
 
     /// <summary>Минимальный масштаб отображения — 10%.</summary>
     private const double MinZoom = 0.1;
@@ -36,6 +50,9 @@ public sealed partial class TemplateViewModel : ObservableObject
     private const int DefaultFontSize = 48;
     private const string DefaultFontFamily = "Arial";
     private const FieldAlignment DefaultAlignment = FieldAlignment.Center;
+
+    /// <summary>Задержка автообновления превью.</summary>
+    private static readonly TimeSpan PreviewDebounce = TimeSpan.FromMilliseconds(200);
 
     /// <summary>
     /// Информация о текущем шаблоне. null, если шаблон не загружен.
@@ -60,6 +77,14 @@ public sealed partial class TemplateViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private string? _errorMessage;
+
+    
+    /// <summary>
+    /// PNG-байты готового превью грамоты с текстом первого участника.
+    /// null, если превью ещё не отрисовано.
+    /// </summary>
+    [ObservableProperty]
+    private byte[]? _renderedPreview;
 
     /// <summary>
     /// Масштаб отображения шаблона. 1.0 = 100%.
@@ -94,6 +119,12 @@ public sealed partial class TemplateViewModel : ObservableObject
     /// Есть ли выбранное размещение (для активации панели настройки).
     /// </summary>
     public bool HasSelectedPlacement => SelectedPlacement is not null;
+
+
+    /// <summary>
+    /// Есть ли отрисованное превью.
+    /// </summary>
+    public bool HasRenderedPreview => RenderedPreview is not null;
 
     /// <summary>
     /// Ширина шаблона в отображаемых пикселях с учётом масштаба.
@@ -142,10 +173,19 @@ public sealed partial class TemplateViewModel : ObservableObject
 
     public TemplateViewModel(
         ITemplateStorage templateStorage,
-        IFilePicker filePicker)
+        IFilePicker filePicker,
+        ITemplateRenderer templateRenderer)
     {
         _templateStorage = templateStorage;
         _filePicker = filePicker;
+        _templateRenderer = templateRenderer;
+
+        _previewTimer = new DispatcherTimer
+        {
+            Interval = PreviewDebounce,
+            IsEnabled = false
+        };
+        _previewTimer.Tick += OnPreviewTimerTick;
     }
 
     // ---------------------------------------------------------------------
@@ -180,6 +220,120 @@ public sealed partial class TemplateViewModel : ObservableObject
         TryLoadExistingTemplate();
 
         LoadPlacements(project.Placements);
+    }
+
+    /// <summary>
+    /// Установить значения полей для превью (от первого участника).
+    /// Запускает отложенное обновление.
+    /// </summary>
+    public void SetFieldValues(IReadOnlyDictionary<string, string> fieldValues)
+    {
+        _fieldValues = fieldValues ?? new Dictionary<string, string>();
+
+        UpdatePlacementsDisplayText();
+
+        RequestPreviewRender();
+    }
+
+    /// <summary>
+    /// Обновить DisplayText у всех размещений.
+    /// </summary>
+    private void UpdatePlacementsDisplayText()
+    {
+        foreach (var placement in Placements)
+        {
+            placement.DisplayText = GetFieldValue(placement.FieldName);
+        }
+    }
+
+    /// <summary>
+    /// Запустить отложенное обновление превью.
+    /// </summary>
+    private void RequestPreviewRender()
+    {
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private void OnPreviewTimerTick(object? sender, EventArgs e)
+    {
+        _previewTimer.Stop();
+        RenderPreviewNow();
+    }
+
+    /// <summary>
+    /// Отрисовать превью немедленно. Для тестов и для явного вызова.
+    /// </summary>
+    public void RenderPreviewNow()
+    {
+        if (Template is null || _projectFolderPath is null)
+        {
+            RenderedPreview = null;
+            return;
+        }
+
+        var templatePath = _templateStorage.GetTemplatePath(_projectFolderPath);
+
+        // Для placements без значения — подставляем имя поля.
+        var values = BuildPreviewValues();
+
+        try
+        {
+            RenderedPreview = _templateRenderer.RenderPreview(
+                templatePath,
+                GetPlacementsSnapshot(),
+                values);
+        }
+        catch (Exception ex)
+        {
+            RenderedPreview = null;
+            ErrorMessage = $"Не удалось отрисовать превью: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Собрать словарь значений для превью:
+    /// все поля из placements получают значение из _fieldValues
+    /// или своё имя как заглушку.
+    /// </summary>
+    private IReadOnlyDictionary<string, string> BuildPreviewValues()
+    {
+        var result = new Dictionary<string, string>();
+
+        foreach (var placement in Placements)
+        {
+            if (_fieldValues.TryGetValue(placement.FieldName, out var value) &&
+                !string.IsNullOrWhiteSpace(value))
+            {
+                result[placement.FieldName] = value;
+            }
+            else
+            {
+                result[placement.FieldName] = placement.FieldName;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Получить значение поля для отображения на шаблоне.
+    /// Если значения нет — возвращает имя поля как заглушку.
+    /// </summary>
+    private string GetFieldValue(string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(fieldName))
+        {
+            return string.Empty;
+        }
+
+        if (_fieldValues.TryGetValue(fieldName, out var value) &&
+            !string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        return fieldName;
     }
 
     /// <summary>
@@ -220,6 +374,19 @@ public sealed partial class TemplateViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Пробросить ширину шаблона во все размещения.
+    /// </summary>
+    private void UpdatePlacementsTemplateWidth()
+    {
+        var width = Template?.Width ?? 0;
+
+        foreach (var placement in Placements)
+        {
+            placement.TemplateWidth = width;
+        }
+    }
+
+    /// <summary>
     /// Загрузить размещения из проекта. Заменяет текущий список.
     /// </summary>
     private void LoadPlacements(IReadOnlyList<FieldPlacement> placements)
@@ -236,7 +403,9 @@ public sealed partial class TemplateViewModel : ObservableObject
         {
             var vm = new FieldPlacementViewModel(model)
             {
-                ZoomLevel = ZoomLevel
+                ZoomLevel = ZoomLevel,
+                TemplateWidth = Template?.Width ?? 0,
+                DisplayText = GetFieldValue(model.FieldName)
             };
             vm.Changed += OnPlacementViewModelChanged;
             Placements.Add(vm);
@@ -372,7 +541,9 @@ public sealed partial class TemplateViewModel : ObservableObject
 
         var vm = new FieldPlacementViewModel(model)
         {
-            ZoomLevel = ZoomLevel
+            ZoomLevel = ZoomLevel,
+            TemplateWidth = Template?.Width ?? 0,
+            DisplayText = GetFieldValue(field.Name)
         };
         vm.Changed += OnPlacementViewModelChanged;
         Placements.Add(vm);
@@ -390,6 +561,7 @@ public sealed partial class TemplateViewModel : ObservableObject
         SelectedPlacement = vm;
 
         RaisePlacementsChanged();
+        RequestPreviewRender();
     }
 
     /// <summary>
@@ -453,6 +625,7 @@ public sealed partial class TemplateViewModel : ObservableObject
             }
 
             RaisePlacementsChanged();
+            RequestPreviewRender();
         }
     }
 
@@ -472,6 +645,7 @@ public sealed partial class TemplateViewModel : ObservableObject
     private void OnPlacementViewModelChanged(object? sender, EventArgs e)
     {
         RaisePlacementsChanged();
+        RequestPreviewRender();
     }
 
     private void RaisePlacementsChanged()
@@ -516,8 +690,13 @@ public sealed partial class TemplateViewModel : ObservableObject
             TemplatePath = _templateStorage.GetTemplatePath(_projectFolderPath);
             PreviewImage = File.ReadAllBytes(TemplatePath);
 
+            UpdatePlacementsTemplateWidth();
+
             // Сообщаем MainViewModel — он сохранит в project.json.
             TemplateChanged?.Invoke(this, info);
+
+            // Шаблон изменился — сразу просим перерисовать превью.
+            RequestPreviewRender();
         }
         catch (FileNotFoundException ex)
         {
@@ -575,6 +754,10 @@ public sealed partial class TemplateViewModel : ObservableObject
         OnPropertyChanged(nameof(HasTemplate));
         OnPropertyChanged(nameof(ScaledWidth));
         OnPropertyChanged(nameof(ScaledHeight));
+
+        UpdatePlacementsTemplateWidth();
+
+        RequestPreviewRender();
     }
 
     partial void OnZoomLevelChanged(double value)
@@ -609,6 +792,11 @@ public sealed partial class TemplateViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(HasSelectedPlacement));
+    }
+
+    partial void OnRenderedPreviewChanged(byte[]? value)
+    {
+        OnPropertyChanged(nameof(HasRenderedPreview));
     }
 
     partial void OnSelectedFieldRowChanged(FieldRowViewModel? value)

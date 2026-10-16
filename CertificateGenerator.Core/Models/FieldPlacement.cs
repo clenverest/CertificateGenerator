@@ -28,6 +28,12 @@ public sealed class FieldPlacement
     public string TextColor { get; }
 
     /// <summary>
+    /// Признак «по центру шаблона по горизонтали».
+    /// Если true — X игнорируется, позиция по горизонтали = Template.Width / 2.
+    /// </summary>
+    public bool IsCenteredHorizontally { get; }
+
+    /// <summary>
     /// Создать размещение поля.
     /// </summary>
     /// <param name="fieldName">Имя поля, к которому относится размещение.</param>
@@ -37,6 +43,7 @@ public sealed class FieldPlacement
     /// <param name="fontFamily">Имя шрифта (например, "Arial").</param>
     /// <param name="alignment">Выравнивание текста.</param>
     /// <param name="textColor">Цвет текста, по умолчанию чёрный.</param>
+    /// <param name="isCenteredHorizontally">Признак «по центру шаблона».</param>
     public FieldPlacement(
         string fieldName,
         int x,
@@ -44,7 +51,8 @@ public sealed class FieldPlacement
         int fontSize,
         string fontFamily,
         FieldAlignment alignment,
-        string textColor = "#000000")
+        string textColor = "#000000",
+        bool isCenteredHorizontally = false)
     {
         if (string.IsNullOrWhiteSpace(fieldName))
         {
@@ -81,6 +89,7 @@ public sealed class FieldPlacement
         FontFamily = fontFamily;
         Alignment = alignment;
         TextColor = textColor;
+        IsCenteredHorizontally = isCenteredHorizontally;
     }
 
     // ---------------------------------------------------------------------
@@ -89,29 +98,33 @@ public sealed class FieldPlacement
 
     /// <summary>Вернуть копию с новой координатой X.</summary>
     public FieldPlacement WithX(int x)
-        => new(FieldName, x, Y, FontSize, FontFamily, Alignment, TextColor);
+        => new(FieldName, x, Y, FontSize, FontFamily, Alignment, TextColor, IsCenteredHorizontally);
 
     /// <summary>Вернуть копию с новой координатой Y.</summary>
     public FieldPlacement WithY(int y)
-        => new(FieldName, X, y, FontSize, FontFamily, Alignment, TextColor);
+        => new(FieldName, X, y, FontSize, FontFamily, Alignment, TextColor, IsCenteredHorizontally);
 
     /// <summary>Вернуть копию с новыми координатами X и Y.</summary>
     public FieldPlacement WithPosition(int x, int y)
-        => new(FieldName, x, y, FontSize, FontFamily, Alignment, TextColor);
+        => new(FieldName, x, y, FontSize, FontFamily, Alignment, TextColor, IsCenteredHorizontally);
 
     /// <summary>Вернуть копию с новым размером шрифта.</summary>
     public FieldPlacement WithFontSize(int fontSize)
-        => new(FieldName, X, Y, fontSize, FontFamily, Alignment, TextColor);
+        => new(FieldName, X, Y, fontSize, FontFamily, Alignment, TextColor, IsCenteredHorizontally);
 
     /// <summary>Вернуть копию с новым шрифтом.</summary>
     public FieldPlacement WithFontFamily(string fontFamily)
-        => new(FieldName, X, Y, FontSize, fontFamily, Alignment, TextColor);
+        => new(FieldName, X, Y, FontSize, fontFamily, Alignment, TextColor, IsCenteredHorizontally);
 
     /// <summary>Вернуть копию с новым выравниванием.</summary>
     public FieldPlacement WithAlignment(FieldAlignment alignment)
-        => new(FieldName, X, Y, FontSize, FontFamily, alignment, TextColor);
+        => new(FieldName, X, Y, FontSize, FontFamily, alignment, TextColor, IsCenteredHorizontally);
 
     /// <summary>Вернуть копию с новым цветом текста.</summary>
     public FieldPlacement WithTextColor(string textColor)
-        => new(FieldName, X, Y, FontSize, FontFamily, Alignment, textColor);
+        => new(FieldName, X, Y, FontSize, FontFamily, Alignment, textColor, IsCenteredHorizontally);
+
+    /// <summary>Вернуть копию с новым значением признака «по центру».</summary>
+    public FieldPlacement WithCenteredHorizontally(bool isCentered)
+        => new(FieldName, X, Y, FontSize, FontFamily, Alignment, TextColor, isCentered);
 }

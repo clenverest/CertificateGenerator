@@ -331,19 +331,28 @@ public sealed partial class MainViewModel : ObservableObject
         if (TableData is null || TableData.Rows.Count == 0)
         {
             OnPropertyChanged(nameof(HasPreviews));
+
+            // Пустой словарь — превью грамоты покажет имена полей.
+            Template.SetFieldValues(new Dictionary<string, string>());
             return;
         }
 
         var firstRow = TableData.Rows[0];
         var fields = Fields.GetFieldsSnapshot();
 
+        var values = new Dictionary<string, string>();
+
         foreach (var field in fields)
         {
             var value = FieldValueResolver.Resolve(field, firstRow);
             FieldPreviews.Add(new FieldPreviewItem(field.Name, value));
+            values[field.Name] = value;
         }
 
         OnPropertyChanged(nameof(HasPreviews));
+
+        // Сообщаем TemplateViewModel значения для превью.
+        Template.SetFieldValues(values);
     }
 
     /// <summary>

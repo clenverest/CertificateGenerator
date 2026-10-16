@@ -7,6 +7,7 @@ using CertificateGenerator.Wpf.Services;
 using CertificateGenerator.Wpf.ViewModels;
 using CertificateGenerator.Infrastructure.Readers;
 using CertificateGenerator.Core.Validators;
+using CertificateGenerator.Infrastructure.Rendering;
 
 namespace CertificateGenerator.Wpf;
 
@@ -46,6 +47,7 @@ public partial class App : Application
         services.AddSingleton<ICreateProjectDialogService, CreateProjectDialogService>();
         services.AddSingleton<IWindowNavigator, WpfWindowNavigator>();
         services.AddSingleton<IFieldEditDialogService, FieldEditDialogService>();
+        services.AddSingleton<ITemplateRenderer, SkiaTemplateRenderer>();
         
 
         // ViewModels.
