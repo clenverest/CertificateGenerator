@@ -70,6 +70,16 @@
                         BorderThickness="0"
                         Cursor="Hand" />
 
+                <Button Content="Сгенерировать все"
+                        Command="{Binding GenerateAllCommand}"
+                        Margin="8,0,0,0"
+                        Padding="16,8"
+                        FontSize="14"
+                        Background="#8A6D00"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Cursor="Hand" />
+
                 <StackPanel Orientation="Horizontal"
                             Margin="16,0,0,0"
                             VerticalAlignment="Center"
@@ -746,6 +756,124 @@
                                     Cursor="Hand" />
                         </StackPanel>
                     </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- Вкладка «Генерация» -->
+            <TabItem Header="Генерация">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Кнопки управления -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Отменить"
+                                Command="{Binding Generation.CancelCommand}"
+                                Padding="16,8"
+                                FontSize="14"
+                                Background="#F3F3F3"
+                                BorderThickness="0"
+                                Cursor="Hand" />
+
+                        <Button Content="Открыть папку"
+                                Command="{Binding Generation.OpenFolderCommand}"
+                                Margin="8,0,0,0"
+                                Padding="16,8"
+                                FontSize="14"
+                                Background="#0078D4"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Cursor="Hand" />
+                    </StackPanel>
+
+                    <!-- Прогресс -->
+                    <Border Grid.Row="1"
+                            Padding="12"
+                            Background="#F8F8F8"
+                            CornerRadius="4"
+                            Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Generation.ProgressText}"
+                                    FontSize="13"
+                                    FontWeight="SemiBold"
+                                    Foreground="#202020" />
+
+                            <ProgressBar Value="{Binding Generation.ProgressFraction, Mode=OneWay}"
+                                    Maximum="1"
+                                    Height="8"
+                                    Margin="0,8,0,0" />
+
+                            <TextBlock Text="{Binding Generation.CurrentName}"
+                                    FontSize="12"
+                                    Foreground="#605E5C"
+                                    Margin="0,4,0,0"
+                                    TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Итоговая сводка + путь ZIP -->
+                    <Border Grid.Row="2"
+                            Background="#E6F4EA"
+                            BorderBrush="#107C10"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="12,8"
+                            Margin="0,0,0,12"
+                            Visibility="{Binding Generation.HasZip, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Generation.SummaryText}"
+                                    FontSize="14"
+                                    FontWeight="SemiBold"
+                                    Foreground="#107C10" />
+                            <TextBlock Text="{Binding Generation.ZipPath}"
+                                    FontSize="12"
+                                    Foreground="#605E5C"
+                                    Margin="0,4,0,0"
+                                    TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Список результатов -->
+                    <DataGrid Grid.Row="3"
+                            ItemsSource="{Binding Generation.Items}"
+                            AutoGenerateColumns="False"
+                            IsReadOnly="True"
+                            CanUserAddRows="False"
+                            CanUserDeleteRows="False"
+                            HeadersVisibility="Column"
+                            GridLinesVisibility="Horizontal"
+                            Background="White"
+                            BorderBrush="#E0E0E0"
+                            BorderThickness="1"
+                            RowHeight="28"
+                            Visibility="{Binding Generation.HasResults, Converter={StaticResource BoolToVisibility}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="#"
+                                                Binding="{Binding DisplayRowNumber}"
+                                                Width="40" />
+                            <DataGridTextColumn Header="Участник"
+                                                Binding="{Binding DisplayName}"
+                                                Width="2*" />
+                            <DataGridTextColumn Header="Статус"
+                                                Binding="{Binding StatusLabel}"
+                                                Width="120">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground"
+                                                Value="{Binding StatusColor}" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Подробности"
+                                                Binding="{Binding Details}"
+                                                Width="3*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </Grid>
             </TabItem>
         </TabControl>
