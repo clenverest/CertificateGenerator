@@ -21,4 +21,25 @@ public sealed class WpfFilePicker : IFilePicker
         var result = dialog.ShowDialog();
         return result == true ? dialog.FileName : null;
     }
+
+    public string? PickSaveFile(
+    string title,
+    string filter,
+    string defaultFileName,
+    string? defaultFolderPath = null)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = title,
+            Filter = filter,
+            FileName = defaultFileName,
+            InitialDirectory = defaultFolderPath ?? string.Empty,
+            OverwritePrompt = true,
+            AddExtension = true,
+            DefaultExt = ".pdf"
+        };
+
+        var result = dialog.ShowDialog();
+        return result == true ? dialog.FileName : null;
+    }
 }

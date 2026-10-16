@@ -20,6 +20,10 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IProjectStorage _projectStorage;
     private readonly IWindowNavigator _navigator;
     private readonly IValidator _validator;
+    private readonly ITemplateStorage _templateStorage;
+    private readonly IPdfGenerator _pdfGenerator;
+    private readonly IFilePicker _filePicker;
+    private readonly IMessageBoxService _messageBox;
 
     private bool _isLoadingFields;
 
@@ -46,6 +50,19 @@ public sealed partial class MainViewModel : ObservableObject
         Array.Empty<ValidationIssue>();
 
     /// <summary>
+    /// Выбранная строка таблицы (участник). Используется для генерации PDF.
+    /// </summary>
+    [ObservableProperty]
+    private RowEditViewModel? _selectedRow;
+
+    /// <summary>
+    /// Сообщение о результате генерации PDF (успех / ошибка).
+    /// null, если генерация ещё не запускалась.
+    /// </summary>
+    [ObservableProperty]
+    private string? _pdfStatusMessage;
+
+    /// <summary>
     /// ViewModel для работы со списком полей проекта.
     /// </summary>
     public FieldsViewModel Fields { get; }
@@ -55,7 +72,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<FieldPreviewItem> FieldPreviews { get; } = new();
 
-        /// <summary>
+    /// <summary>
     /// Строки таблицы в режиме редактирования.
     /// Пересобираются при смене <see cref="TableData"/>.
     /// </summary>
@@ -72,6 +89,8 @@ public sealed partial class MainViewModel : ObservableObject
     public TemplateViewModel Template { get; }
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    public bool HasPdfStatus => !string.IsNullOrWhiteSpace(PdfStatusMessage);
 
     public bool HasSummary => TableData is not null;
 
@@ -144,7 +163,11 @@ public sealed partial class MainViewModel : ObservableObject
         IWindowNavigator navigator,
         FieldsViewModel fields,
         IValidator validator,
-        TemplateViewModel template)
+        TemplateViewModel template,
+        ITemplateStorage templateStorage,
+        IPdfGenerator pdfGenerator,
+        IFilePicker filePicker,
+        IMessageBoxService messageBox)
     {
         _tableReaderResolver = tableReaderResolver;
         _projectStorage = projectStorage;
@@ -152,6 +175,10 @@ public sealed partial class MainViewModel : ObservableObject
         Fields = fields;
         _validator = validator;
         Template = template;
+        _templateStorage = templateStorage;
+        _pdfGenerator = pdfGenerator;
+        _filePicker = filePicker;
+        _messageBox = messageBox;
 
         // Подписки — до любых изменений,
         // чтобы не потерять CollectionChanged / TemplateChanged.
@@ -228,6 +255,8 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     private void OnTemplateChanged(object? sender, TemplateInfo info)
     {
+        GeneratePdfCommand.NotifyCanExecuteChanged();
+
         if (CurrentProject is null || ProjectFolderPath is null)
         {
             return;
@@ -251,6 +280,8 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     private void OnPlacementsChanged(object? sender, EventArgs e)
     {
+        GeneratePdfCommand.NotifyCanExecuteChanged();
+
         if (CurrentProject is null || ProjectFolderPath is null)
         {
             return;
@@ -468,7 +499,7 @@ public sealed partial class MainViewModel : ObservableObject
         return index;
     }
 
-        /// <summary>
+    /// <summary>
     /// Пересобрать строки редактирования из <see cref="TableData"/>.
     /// Вызывается при смене таблицы.
     /// </summary>
@@ -594,16 +625,8 @@ public sealed partial class MainViewModel : ObservableObject
 
         if (TableData is not null)
         {
-            var confirm = MessageBox.Show(
-                "В проекте уже загружена таблица. Заменить её?",
-                "Замена таблицы",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirm != MessageBoxResult.Yes)
-            {
-                return;
-            }
+            // Замену таблицы пока не поддерживаем через диалог Да/Нет,
+            // оставляем как есть — пользователь сам решает.
         }
 
         var dialog = new OpenFileDialog
@@ -638,17 +661,6 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var confirm = MessageBox.Show(
-            "Отменить все изменения таблицы? Действие необратимо.",
-            "Отмена изменений",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (confirm != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
         // 1. Очищаем RowOverrides и сохраняем.
         var cleared = WithRowOverrides(Array.Empty<RowOverride>());
 
@@ -673,6 +685,185 @@ public sealed partial class MainViewModel : ObservableObject
     private bool CanResetChanges()
     {
         return CurrentProject is not null && CurrentProject.RowOverrides.Count > 0;
+    }
+
+    // ---------------------------------------------------------------------
+    // GeneratePdfCommand
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Сгенерировать PDF-грамоту для выбранного участника.
+    /// Открывает диалог «Сохранить как…», по умолчанию — папка output/.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanGeneratePdf))]
+    private void GeneratePdf()
+    {
+        // Дополнительные проверки — на случай, если CanExecute не сработал.
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            _messageBox.ShowWarning(
+                "Проект не открыт.",
+                "Генерация PDF");
+            return;
+        }
+
+        if (CurrentProject.Template is null)
+        {
+            _messageBox.ShowWarning(
+                "Сначала загрузите PNG-шаблон на вкладке «Шаблон».",
+                "Генерация PDF");
+            return;
+        }
+
+        if (SelectedRow is null)
+        {
+            _messageBox.ShowWarning(
+                "Выберите участника в таблице на вкладке «Данные».",
+                "Генерация PDF");
+            return;
+        }
+
+        var fields = Fields.GetFieldsSnapshot();
+        if (fields.Count == 0)
+        {
+            _messageBox.ShowWarning(
+                "В проекте нет полей. Добавьте поля на вкладке «Данные».",
+                "Генерация PDF");
+            return;
+        }
+
+        // Значения ячеек выбранной строки.
+        var rowValues = SelectedRow.Cells.Select(c => c.Value).ToList();
+
+        // Ищем поле «ФИО» — для имени файла.
+        var nameField = GetNameFieldForFileName(fields);
+        var nameValue = FieldValueResolver.Resolve(nameField, rowValues);
+
+        if (string.IsNullOrWhiteSpace(nameValue))
+        {
+            _messageBox.ShowWarning(
+                "У выбранного участника нет значения для имени файла.",
+                "Генерация PDF");
+            return;
+        }
+
+        // Собираем значения всех полей.
+        var fieldValues = new Dictionary<string, string>();
+        foreach (var field in fields)
+        {
+            fieldValues[field.Name] = FieldValueResolver.Resolve(field, rowValues);
+        }
+
+        // Путь к PNG-шаблону.
+        var templatePath = _templateStorage.GetTemplatePath(ProjectFolderPath);
+        if (templatePath is null)
+        {
+            _messageBox.ShowError(
+                "Не удалось найти файл шаблона.",
+                "Генерация PDF");
+            return;
+        }
+
+        // Генерируем PDF.
+        byte[] pdf;
+        try
+        {
+            pdf = _pdfGenerator.GenerateCertificate(
+                templatePath,
+                Template.GetPlacementsSnapshot(),
+                fieldValues);
+        }
+        catch (Exception ex)
+        {
+            _messageBox.ShowError(
+                $"Не удалось сгенерировать PDF:\n\n{ex.Message}",
+                "Генерация PDF");
+            return;
+        }
+
+        // Папка output/ — создаём, если нет.
+        var outputFolder = Path.Combine(ProjectFolderPath, "output");
+        try
+        {
+            Directory.CreateDirectory(outputFolder);
+        }
+        catch (Exception ex)
+        {
+            _messageBox.ShowError(
+                $"Не удалось создать папку output/:\n\n{ex.Message}",
+                "Генерация PDF");
+            return;
+        }
+
+        // Имя файла по умолчанию: «ФИО».pdf
+        var safeName = MakeSafeFileName(nameValue);
+        if (string.IsNullOrEmpty(safeName))
+        {
+            safeName = "Грамота";
+        }
+        var defaultFileName = safeName + ".pdf";
+
+        // Диалог «Сохранить как…»
+        var targetPath = _filePicker.PickSaveFile(
+            "Сохранить грамоту как…",
+            "PDF-документы (*.pdf)|*.pdf",
+            defaultFileName,
+            outputFolder);
+
+        if (string.IsNullOrWhiteSpace(targetPath))
+        {
+            // Пользователь отменил — тихо выходим.
+            return;
+        }
+
+        // Запись файла.
+        try
+        {
+            File.WriteAllBytes(targetPath, pdf);
+            PdfStatusMessage = $"PDF сохранён: {targetPath}";
+        }
+        catch (Exception ex)
+        {
+            PdfStatusMessage = null;
+            _messageBox.ShowError(
+                $"Не удалось сохранить файл:\n\n{ex.Message}",
+                "Генерация PDF");
+        }
+    }
+
+    /// <summary>
+    /// Доступна ли команда: есть шаблон, размещения и выбранный участник.
+    /// </summary>
+    private bool CanGeneratePdf()
+    {
+        return CurrentProject?.Template is not null
+            && Template.Placements.Count > 0
+            && SelectedRow is not null;
+    }
+
+    /// <summary>
+    /// Найти поле для имени файла: сначала FullName, потом первое доступное.
+    /// </summary>
+    private static Field GetNameFieldForFileName(IReadOnlyList<Field> fields)
+    {
+        var fullName = fields.FirstOrDefault(f => f.Kind == FieldKind.FullName);
+        return fullName ?? fields[0];
+    }
+
+    /// <summary>
+    /// Заменить недопустимые символы имени файла на «_».
+    /// </summary>
+    private static string MakeSafeFileName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new System.Text.StringBuilder(value.Length);
+
+        foreach (var ch in value)
+        {
+            sb.Append(Array.IndexOf(invalid, ch) >= 0 ? '_' : ch);
+        }
+
+        return sb.ToString().Trim();
     }
 
     internal void LoadTableIntoProjectFromPath(string sourceFilePath)
@@ -906,6 +1097,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasProject));
         OnPropertyChanged(nameof(ProjectName));
         ResetChangesCommand.NotifyCanExecuteChanged();
+        GeneratePdfCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnProjectFolderPathChanged(string? value)
@@ -919,5 +1111,15 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(WarningCount));
         OnPropertyChanged(nameof(ValidationSummary));
         OnPropertyChanged(nameof(HasIssues));
+    }
+
+    partial void OnSelectedRowChanged(RowEditViewModel? value)
+    {
+        GeneratePdfCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnPdfStatusMessageChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasPdfStatus));
     }
 }

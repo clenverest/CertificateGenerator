@@ -20,18 +20,27 @@ public sealed class MainViewModelTests
         FakeProjectStorage? storage = null,
         FakeWindowNavigator? navigator = null,
         FieldsViewModel? fields = null,
-        FakeValidator? validator = null)
+        FakeValidator? validator = null,
+        FakeTemplateStorage? templateStorage = null,
+        FakePdfGenerator? pdfGenerator = null,
+        FakeFilePicker? filePicker = null,
+        FakeMessageBoxService? messageBox = null)
     {
+        var tmplStorage = templateStorage ?? new FakeTemplateStorage();
+        var fp = filePicker ?? new FakeFilePicker();
+        var mb = messageBox ?? new FakeMessageBoxService();
+
         return new MainViewModel(
             resolver ?? new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
             storage ?? new FakeProjectStorage(),
             navigator ?? new FakeWindowNavigator(),
             fields ?? new FieldsViewModel(new FakeFieldEditDialogService()),
             validator ?? new FakeValidator(),
-            new TemplateViewModel(
-                new FakeTemplateStorage(),
-                new FakeFilePicker(),
-                new FakeTemplateRenderer()));    
+            new TemplateViewModel(tmplStorage, fp, new FakeTemplateRenderer()),
+            tmplStorage,
+            pdfGenerator ?? new FakePdfGenerator(),
+            fp,
+            mb);
     }
 
     private static MainViewModel CreateViewModelWithOverride(

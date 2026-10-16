@@ -42,6 +42,7 @@ public partial class App : Application
         services.AddSingleton<ITableReaderResolver, TableReaderResolver>();
         services.AddSingleton<ITemplateStorage, FileTemplateStorage>();
         services.AddSingleton<IPdfGenerator, QuestPdfGenerator>();
+        
 
         // Валидация.
         services.AddSingleton<IValidator>(ProjectValidator.CreateDefault());
@@ -53,6 +54,7 @@ public partial class App : Application
         services.AddSingleton<IWindowNavigator, WpfWindowNavigator>();
         services.AddSingleton<IFieldEditDialogService, FieldEditDialogService>();
         services.AddSingleton<ITemplateRenderer, SkiaTemplateRenderer>();
+        services.AddSingleton<IMessageBoxService, WpfMessageBoxService>();
         
 
         // ViewModels.
