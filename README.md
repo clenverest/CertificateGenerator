@@ -169,21 +169,95 @@
 - Кнопка «Отменить изменения» в `MainWindow` (серая, если правок нет).
 - Исходный Excel в `source/` не трогается.
 
-### 🔄 Этап 2.11 — приёмка (в работе)
+**2.11 — приёмка Этапа 2.** Прогнаны сценарии, всё работает сквозным образом.
 
-Прогнать сценарии из README, убедиться, что всё работает сквозным образом.
-Никакого нового кода — только проверка.
+### ✅ Этап 3 завершён: шаблон и настройка полей
 
-### ⏳ Этап 3. Шаблон и настройка полей
+**3.0 — каркас моделей и интерфейсов для шаблона.**
+- Модели: `TemplateInfo`, `FieldPlacement`, `FieldAlignment`.
+- `Project.Template`, `Project.Placements`.
+- Интерфейсы: `ITemplateStorage`, `ITemplateRenderer`.
 
-Загрузить PNG. Задать координаты, размер, выравнивание, шрифт.
-Добавить статические поля. Увидеть превью.
+**3.1 — хранилище шаблона.**
+- `FileTemplateStorage`: копирует PNG в `template/template.png`, читает размеры через SkiaSharp.
+- Пакет `SkiaSharp` добавлен в `Infrastructure.csproj`.
 
-**Тест:** вижу, как будет выглядеть грамота.
+**3.2 — рендер превью.**
+- `SkiaTemplateRenderer` — реализация `ITemplateRenderer`.
+- Рисует текст на PNG с учётом выравнивания, шрифта, размера.
+- Обрезка по границам шаблона (`ClipRect`).
 
-### ⏳ Этап 4. Генерация одной грамоты
+**3.3 — вкладка «Шаблон» и загрузка PNG.**
+- `TemplateViewModel` — загрузка PNG, хранение `TemplateInfo`, превью.
+- `WpfFilePicker` — реализация `IFilePicker`.
+- Третья вкладка «Шаблон» в `MainWindow`.
+- Конвертер `ByteArrayToBitmapImageConverter`.
+- Метод `SetTemplate` в `IProjectStorage` / `JsonProjectStorage`.
+- Зум шаблона (10%–400%, шаг 25%, слайдер + кнопки).
+- Панель зума с кнопками «+/−», слайдером, «100%», процентом.
 
-Выбрать участника. Сгенерировать PDF. «Сохранить как…»
+**3.4 — расстановка полей.**
+- `FieldRowViewModel` — строка списка полей на вкладке «Шаблон».
+- `FieldPlacementViewModel` — VM одного размещения.
+- `TemplateViewModel.Placements`, `FieldRows`, `SelectedPlacement`, `SelectedFieldRow`.
+- Методы `SyncFields`, `AddPlacementForField`, `RemovePlacement`, `HasPlacement`, `GetPlacement`, `GetPlacementsSnapshot`.
+- Событие `PlacementsChanged` → сохранение в `project.json`.
+- Список полей слева (галочка / точка), панель настройки под шаблоном.
+- Маркеры полей на шаблоне (эллипсы с подписью), drag-and-drop маркеров.
+- Проброс `ZoomLevel` и `TemplateWidth` в placements.
+
+**3.5 — drag-and-drop маркеров.**
+- `PreviewMouseLeftButtonDown` на маркере → старт drag.
+- `PreviewMouseMove` и `PreviewMouseLeftButtonUp` на окне.
+- Порог `SystemParameters.MinimumHorizontalDragDistance` — отличает клик от drag.
+- Escape — отмена drag (возврат координат).
+- `CaptureMouse` — чтобы MouseUp ловился за пределами кнопки.
+
+**3.6 — превью грамоты с текстом.**
+- `TemplateViewModel.RenderedPreview` — PNG-байты готового превью.
+- `RenderPreviewNow` + debounce (200 мс) через `DispatcherTimer`.
+- `SetFieldValues` — значения от первого участника из `MainViewModel.UpdateFieldPreviews`.
+- Fallback: если значения нет — подставляется имя поля.
+- Третья колонка с превью (позже убрана — см. 3.6-fix.1).
+
+**3.6-fix.1 — WYSIWYG: текст прямо на шаблоне.**
+- Замена маркеров-эллипсов на **реальный текст** прямо на шаблоне.
+- `FieldPlacementViewModel.DisplayText`, `EffectiveFontSize`, `AlignmentOffsetX`, `FinalDisplayX`.
+- Тонкая синяя рамка вокруг выбранного поля.
+- Превью справа **убрано** — редактор сам всё показывает.
+- Выравнивание: `Center` / `Right` — сдвиг через `Canvas.Left` = `FinalDisplayX` (а не `RenderTransform`).
+
+**3.6-fix.2 — флаг «По центру шаблона».**
+- `FieldPlacement.IsCenteredHorizontally` — bool в модели.
+- `WithCenteredHorizontally` — иммутабельное обновление.
+- `FieldPlacementViewModel.EffectiveX`, `TemplateWidth`.
+- Чекбокс «По центру» рядом с X.
+- X-TextBox блокируется, если флаг установлен.
+- При drag с флагом — маркер двигается **только по вертикали**.
+- `InverseBoolConverter` — новый конвертер.
+- Панель зума перенесена к кнопкам «Загрузить / Заменить шаблон» (компактнее).
+
+**3.6-fix.3 — устранение лагов при drag.**
+- `FieldPlacementViewModel.BeginDrag` / `EndDrag` / `CancelDrag`.
+- Пока идёт drag — `Changed` **не** вызывается, `Save` **не** срабатывает.
+- При отпускании — один `Changed` → один `Save`.
+- Escape во время drag — `CancelDrag`, координаты возвращаются без сохранения.
+- `MainViewModel.OnPlacementsChanged` — убран временный замер `Console.WriteLine`.
+
+### ⏳ Этап 4. Генерация одной грамоты (следующий)
+
+**Что делаем:**
+1. Выбрать участника из таблицы (вкладка «Данные» или новая вкладка «Генерация»).
+2. Сгенерировать PDF грамоты с данными этого участника.
+3. Кнопка «Сохранить как…» — сохранить PDF куда угодно.
+4. Имя файла по умолчанию: `«ФИО».pdf`.
+
+**Технически:**
+- `IPdfGenerator` в `Core/Interfaces`.
+- `QuestPdfGenerator` в `Infrastructure/Generators`.
+- Рендер PNG (через `ITemplateRenderer`) → вставка в PDF (QuestPDF).
+- `GenerateSingleCertificateCommand` в `MainViewModel` или отдельный `GenerationViewModel`.
+- Диалог «Сохранить как» — `IFilePicker` с фильтром `*.pdf`.
 
 **Тест:** получил один корректный PDF.
 
@@ -210,7 +284,10 @@ CertificateGenerator/
 │ │ ├── IssueSeverity.cs ✅
 │ │ ├── FieldPreviewItem.cs ✅
 │ │ ├── RecentProject.cs ✅
-│ │ └── CreateProjectResult.cs ✅
+│ │ ├── CreateProjectResult.cs ✅
+│ │ ├── TemplateInfo.cs ✅
+│ │ ├── FieldPlacement.cs ✅
+│ │ └── FieldAlignment.cs ✅
 │ ├── Interfaces/
 │ │ ├── ITableReader.cs ✅
 │ │ ├── ITableReaderResolver.cs ✅
@@ -218,9 +295,13 @@ CertificateGenerator/
 │ │ ├── IValidator.cs ✅
 │ │ ├── IRecentProjectsStore.cs ✅
 │ │ ├── IFolderPicker.cs ✅
+│ │ ├── IFilePicker.cs ✅
 │ │ ├── ICreateProjectDialogService.cs ✅
 │ │ ├── IFieldEditDialogService.cs ✅
-│ │ └── IWindowNavigator.cs ✅
+│ │ ├── IWindowNavigator.cs ✅
+│ │ ├── ITemplateStorage.cs ✅
+│ │ ├── ITemplateRenderer.cs ✅
+│ │ └── IPdfGenerator.cs ⏳ Этап 4
 │ ├── Services/
 │ │ ├── ColumnSuggester.cs ✅
 │ │ ├── FieldValueResolver.cs ✅
@@ -237,12 +318,20 @@ CertificateGenerator/
 │ │ └── TableReaderResolver.cs ✅
 │ ├── Storage/
 │ │ ├── JsonProjectStorage.cs ✅
-│ │ └── JsonRecentProjectsStore.cs ✅
+│ │ ├── JsonRecentProjectsStore.cs ✅
+│ │ └── FileTemplateStorage.cs ✅
+│ ├── Rendering/
+│ │ └── SkiaTemplateRenderer.cs ✅
 │ ├── Generators/ ⏳ Этапы 4–5
+│ │ └── QuestPdfGenerator.cs ⏳ Этап 4
 │ └── ZipPacker.cs ⏳ Этап 5
 ├── CertificateGenerator.Wpf/
+│ ├── Converters/
+│ │ ├── ByteArrayToBitmapImageConverter.cs ✅
+│ │ └── InverseBoolConverter.cs ✅
 │ ├── Services/
 │ │ ├── WpfFolderPicker.cs ✅
+│ │ ├── WpfFilePicker.cs ✅
 │ │ ├── CreateProjectDialogService.cs ✅
 │ │ ├── FieldEditDialogService.cs ✅
 │ │ └── WpfWindowNavigator.cs ✅
@@ -256,18 +345,24 @@ CertificateGenerator/
 │ │ ├── CellEditViewModel.cs ✅
 │ │ ├── RowEditViewModel.cs ✅
 │ │ ├── ValidationCellViewModel.cs ✅
-│ │ └── ValidationRowViewModel.cs ✅
+│ │ ├── ValidationRowViewModel.cs ✅
+│ │ ├── TemplateViewModel.cs ✅
+│ │ ├── FieldPlacementViewModel.cs ✅
+│ │ └── FieldRowViewModel.cs ✅
 │ ├── App.xaml ✅ (без StartupUri)
 │ ├── App.xaml.cs ✅ (DI)
 │ ├── MainWindow.xaml + .cs ✅
 │ └── StartupWindow.xaml + .cs ✅
 └── CertificateGenerator.Tests/
 ├── Models/ ✅
-├── Fakes/ ✅ (FakeProjectStorage, FakeValidator, FakeFieldEditDialogService, ...)
+├── Fakes/ ✅ (FakeProjectStorage, FakeValidator, FakeTemplateStorage,
+│ FakeTemplateRenderer, FakeFilePicker, ...)
 ├── Readers/ ✅
 ├── Storage/ ✅
 ├── Services/ ✅
 ├── Validators/ ✅
+├── Rendering/ ✅
+├── Converters/ ✅
 └── ViewModels/ ✅
 
 
@@ -276,8 +371,9 @@ CertificateGenerator/
 - PDF-шаблоны с плейсхолдерами
 - Создание шаблона внутри приложения
 - Несколько шаблонов в одном проекте
-- Drag-and-drop полей на шаблоне
 - Автоматическое уменьшение шрифта
+- Точное измерение ширины текста (сейчас приблизительное `0.55 × fontSize`)
+- Кнопка «Показать точное превью» (SkiaSharp-рендер в модальном окне)
 - Google Sheets / Yandex Tables напрямую
 - Отправка по email
 - QR-коды, подписи, фото
@@ -302,8 +398,8 @@ https://github.com/clenverest/CertificateGenerator
 
 ## Контекст для продолжения в новом чате
 
-**Где мы:** Этапы 1 и 2 (подэтапы 2.0–2.10) завершены.
-Подэтап 2.11 (приёмка Этапа 2) — в работе. Дальше — Этап 3 (PNG-шаблон).
+**Где мы:** Этапы 1, 2, 3 завершены полностью (включая 2.11 и 3.6-fix).
+Следующий — **Этап 4: генерация одной грамоты (PDF)**.
 
 **Что важно помнить при продолжении:**
 
@@ -315,8 +411,9 @@ https://github.com/clenverest/CertificateGenerator
 - `InternalsVisibleTo("CertificateGenerator.Tests")` в `Wpf.csproj`
   и `Infrastructure.csproj`.
 - Иммутабельность моделей: `TableData`, `ColumnInfo`, `Project`, `Field`,
-  `RowOverride`, `ValidationIssue`, `RecentProject`, `CreateProjectResult` —
-  `sealed`, свойства только `get`, изменения через создание нового экземпляра.
+  `RowOverride`, `ValidationIssue`, `RecentProject`, `CreateProjectResult`,
+  `TemplateInfo`, `FieldPlacement` — `sealed`, свойства только `get`,
+  изменения через создание нового экземпляра (`WithX`-паттерн).
 - DI: `Microsoft.Extensions.DependencyInjection` подключён в `App.xaml.cs`.
   Все зависимости — в `ConfigureServices`. **Новая зависимость в конструкторе
   DI-создаваемого класса требует регистрации.**
@@ -325,23 +422,38 @@ https://github.com/clenverest/CertificateGenerator
   `partial void On...Changed` для пересчёта вычисляемых свойств.
   **`NotifyCanExecuteChanged()` надо вызывать вручную** при изменении
   того, от чего зависит `CanExecute`.
-- **Подписки на события — до изменений.** См. `WpfWindowNavigator` и
-  `RebuildRows` (подписка на `RowEditViewModel.ValueChanged` — в момент
-  создания строки, **до** `Rows.Add`).
+- **Подписки на события — до изменений.**
 - **Иммутабельный `TableData` не отражает правки.** Правки живут в
-  `CellEditViewModel.Value`. **Валидация и превью должны использовать
-  `Rows[i].Cells[j].Value`, а не `TableData.Rows[i][j]`.**
-  См. `BuildCurrentTable` в `MainViewModel`.
-- **UI-правки фиксируются по Enter/Tab/LostFocus**, а не на каждое
-  нажатие клавиши. Значит, `ValueChanged` срабатывает умеренно часто.
+  `CellEditViewModel.Value`. Валидация и превью используют
+  `Rows[i].Cells[j].Value`, а не `TableData.Rows[i][j]`.
+- **UI-правки фиксируются по Enter/Tab/LostFocus.**
 - **`RowOverrides` в `project.json`** — только изменённые строки.
   При возврате к исходному значению — override удаляется.
 - **Исходный Excel не трогается.** Все правки — в `project.json`.
+- **`FieldPlacement.IsCenteredHorizontally`** — если true, X игнорируется,
+  позиция по горизонтали = `Template.Width / 2`. При drag такое поле
+  двигается только по вертикали.
+- **Drag маркеров: `BeginDrag` / `EndDrag` / `CancelDrag`.** Во время drag
+  `Changed` не вызывается — Save не срабатывает. Один `Changed` в конце.
+- **WYSIWYG:** текст рисуется прямо на шаблоне через `TextBlock`.
+  `EffectiveFontSize = FontSize * ZoomLevel`.
+  `FinalDisplayX = EffectiveX * ZoomLevel + AlignmentOffsetX`.
+  `AlignmentOffsetX` — **приблизительный** (`0.55 × fontSize` на символ).
+- **Zoom:** от 10% до 400%, шаг 25%. Проброс в `FieldPlacementViewModel.ZoomLevel`
+  и `TemplateWidth` из `TemplateViewModel`.
 - Язык интерфейса: русский. Сообщения об ошибках — на русском.
 - Стиль: Windows 11. Акцент `#0078D4`. Ошибки — `#C42B1C`
   на фоне `#FDE7E9`. Предупреждения — `#8A6D00` на `#FFF4CE`.
   Успех `#107C10` на `#E6F4EA`. Вторичный текст `#605E5C`.
 - Проект как папка: `project.json`, `source/`, `template/`, `output/`.
+  Шаблон хранится как `template/template.png`.
 - `RecentProjectsStore` — в `%APPDATA%\CertificateGenerator\recent.json`.
-  Кириллица не экранируется (UnsafeRelaxedJsonEscaping).
 - **Актуальное число тестов — проверяй через `dotnet test`.**
+- **Планы на Этап 4:**
+  - `IPdfGenerator` в `Core/Interfaces` — метод `GenerateCertificate(...)`.
+  - `QuestPdfGenerator` в `Infrastructure/Generators` — QuestPDF.
+  - Рендер PNG шаблона с текстом (через `SkiaTemplateRenderer`) → вставка
+    в PDF-страницу формата A4.
+  - Выбор участника — из таблицы.
+  - «Сохранить как…» — через `IFilePicker` с фильтром `*.pdf`.
+  - Имя PDF по умолчанию: `«ФИО».pdf`, при дубликате — `«ФИО_2.pdf»`.
