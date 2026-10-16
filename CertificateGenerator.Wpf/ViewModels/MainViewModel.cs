@@ -157,6 +157,8 @@ public sealed partial class MainViewModel : ObservableObject
     public string ProjectPath =>
         ProjectFolderPath ?? string.Empty;
 
+    public GenerationViewModel Generation { get; }
+
     public MainViewModel(
         ITableReaderResolver tableReaderResolver,
         IProjectStorage projectStorage,
@@ -167,7 +169,8 @@ public sealed partial class MainViewModel : ObservableObject
         ITemplateStorage templateStorage,
         IPdfGenerator pdfGenerator,
         IFilePicker filePicker,
-        IMessageBoxService messageBox)
+        IMessageBoxService messageBox,
+        GenerationViewModel generation)
     {
         _tableReaderResolver = tableReaderResolver;
         _projectStorage = projectStorage;
@@ -179,12 +182,21 @@ public sealed partial class MainViewModel : ObservableObject
         _pdfGenerator = pdfGenerator;
         _filePicker = filePicker;
         _messageBox = messageBox;
+        Generation = generation;
 
         // Подписки — до любых изменений,
         // чтобы не потерять CollectionChanged / TemplateChanged.
         Fields.Fields.CollectionChanged += OnFieldsCollectionChanged;
         Template.TemplateChanged += OnTemplateChanged;
         Template.PlacementsChanged += OnPlacementsChanged;
+
+        Generation.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(GenerationViewModel.IsRunning))
+            {
+                GenerateAllCommand.NotifyCanExecuteChanged();
+            }
+        };
     }
 
     /// <summary>
@@ -1121,5 +1133,80 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnPdfStatusMessageChanged(string? value)
     {
         OnPropertyChanged(nameof(HasPdfStatus));
+    }
+
+    // ---------------------------------------------------------------------
+    // GenerateAllCommand — массовая генерация
+    // ---------------------------------------------------------------------
+
+    [RelayCommand(CanExecute = nameof(CanGenerateAll))]
+    private async Task GenerateAllAsync()
+    {
+        // Проверки.
+        if (CurrentProject is null || ProjectFolderPath is null)
+        {
+            _messageBox.ShowWarning("Проект не открыт.", "Массовая генерация");
+            return;
+        }
+
+        if (CurrentProject.Template is null)
+        {
+            _messageBox.ShowWarning(
+                "Сначала загрузите PNG-шаблон на вкладке «Шаблон».",
+                "Массовая генерация");
+            return;
+        }
+
+        var fields = Fields.GetFieldsSnapshot();
+        if (fields.Count == 0)
+        {
+            _messageBox.ShowWarning(
+                "В проекте нет полей. Добавьте поля на вкладке «Данные».",
+                "Массовая генерация");
+            return;
+        }
+
+        if (Rows.Count == 0)
+        {
+            _messageBox.ShowWarning(
+                "Таблица пуста — нечего генерировать.",
+                "Массовая генерация");
+            return;
+        }
+
+        var templatePath = _templateStorage.GetTemplatePath(ProjectFolderPath);
+        if (templatePath is null)
+        {
+            _messageBox.ShowError(
+                "Не удалось найти файл шаблона.",
+                "Массовая генерация");
+            return;
+        }
+
+        // Папка output/.
+        var outputFolder = Path.Combine(ProjectFolderPath, "output");
+        Directory.CreateDirectory(outputFolder);
+
+        var zipName = $"грамоты_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.zip";
+        var zipPath = Path.Combine(outputFolder, zipName);
+
+        // Собираем актуальные строки (значения ячеек).
+        var rows = Rows.Select(r => (IReadOnlyList<string>)r.Cells.Select(c => c.Value).ToList()).ToList();
+
+        // Запускаем в GenerationViewModel.
+        await Generation.RunAsync(
+            templatePath,
+            Template.GetPlacementsSnapshot(),
+            fields,
+            rows,
+            zipPath);
+    }
+
+    private bool CanGenerateAll()
+    {
+        return CurrentProject?.Template is not null
+            && Template.Placements.Count > 0
+            && Rows.Count > 0
+            && !Generation.IsRunning;
     }
 }

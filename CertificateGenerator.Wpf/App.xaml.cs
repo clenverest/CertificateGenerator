@@ -9,6 +9,7 @@ using CertificateGenerator.Infrastructure.Readers;
 using CertificateGenerator.Core.Validators;
 using CertificateGenerator.Infrastructure.Rendering;
 using CertificateGenerator.Infrastructure.Generators;
+using CertificateGenerator.Core.Services;
 
 namespace CertificateGenerator.Wpf;
 
@@ -42,6 +43,7 @@ public partial class App : Application
         services.AddSingleton<ITableReaderResolver, TableReaderResolver>();
         services.AddSingleton<ITemplateStorage, FileTemplateStorage>();
         services.AddSingleton<IPdfGenerator, QuestPdfGenerator>();
+        services.AddSingleton<CertificateBatchGenerator>();
         
 
         // Валидация.
@@ -62,9 +64,13 @@ public partial class App : Application
         services.AddTransient<MainViewModel>();
         services.AddTransient<FieldsViewModel>();
         services.AddTransient<TemplateViewModel>();
+        services.AddTransient<GenerationViewModel>();
 
         // Окна.
         services.AddTransient<StartupWindow>();
+
+        services.AddSingleton<CertificateBatchGenerator>();
+        services.AddSingleton<IZipPacker, ZipPacker>();
     }
 
     protected override void OnStartup(StartupEventArgs e)

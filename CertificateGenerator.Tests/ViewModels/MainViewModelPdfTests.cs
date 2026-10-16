@@ -1,4 +1,5 @@
 using CertificateGenerator.Core.Models;
+using CertificateGenerator.Core.Services;
 using CertificateGenerator.Tests.Fakes;
 using CertificateGenerator.Wpf.ViewModels;
 
@@ -39,6 +40,11 @@ public sealed class MainViewModelPdfTests
         var fp = filePicker ?? new FakeFilePicker();
         var mb = messageBox ?? new FakeMessageBoxService();
 
+        var pdf = pdfGenerator ?? new FakePdfGenerator();
+        var zip = new FakeZipPacker();
+        var batchGen = new CertificateBatchGenerator(pdf, zip);
+        var generation = new GenerationViewModel(batchGen, mb);
+
         var vm = new MainViewModel(
             resolver,
             storage,
@@ -47,9 +53,10 @@ public sealed class MainViewModelPdfTests
             new FakeValidator(),
             new TemplateViewModel(ts, fp, new FakeTemplateRenderer()),
             ts,
-            pdfGenerator ?? new FakePdfGenerator(),
+            pdf,
             fp,
-            mb);
+            mb,
+            generation);
 
         // Проект с шаблоном и одним placement.
         var templateInfo = new TemplateInfo("template.png", 100, 100);
@@ -100,6 +107,12 @@ public sealed class MainViewModelPdfTests
         var ts = new FakeTemplateStorage();
         var fp = new FakeFilePicker();
 
+        var pdfGen = new FakePdfGenerator();
+        var zip = new FakeZipPacker();
+        var mb = new FakeMessageBoxService();
+        var batchGen = new CertificateBatchGenerator(pdfGen, zip);
+        var generation = new GenerationViewModel(batchGen, mb);
+
         var vm = new MainViewModel(
             resolver,
             storage,
@@ -108,9 +121,10 @@ public sealed class MainViewModelPdfTests
             new FakeValidator(),
             new TemplateViewModel(ts, fp, new FakeTemplateRenderer()),
             ts,
-            new FakePdfGenerator(),
+            pdfGen,
             fp,
-            new FakeMessageBoxService());
+            mb,
+            generation);
 
         // Проект БЕЗ шаблона.
         var project = new Project(
@@ -293,6 +307,10 @@ public sealed class MainViewModelPdfTests
         var mb = new FakeMessageBoxService();
         var pdfGenerator = new FakePdfGenerator();
 
+        var zip = new FakeZipPacker();
+        var batchGen = new CertificateBatchGenerator(pdfGenerator, zip);
+        var generation = new GenerationViewModel(batchGen, mb);
+
         var vm = new MainViewModel(
             resolver,
             storage,
@@ -303,7 +321,8 @@ public sealed class MainViewModelPdfTests
             ts,
             pdfGenerator,
             fp,
-            mb);
+            mb,
+            generation);
 
         var field = new Field("ФИО", FieldKind.FullName, new[] { 0 });
         var placement = new FieldPlacement(

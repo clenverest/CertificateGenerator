@@ -3,6 +3,7 @@ using CertificateGenerator.Tests.Fakes;
 using CertificateGenerator.Wpf.ViewModels;
 using CertificateGenerator.Core.Validators;
 using CertificateGenerator.Core.Interfaces;
+using CertificateGenerator.Core.Services;
 
 namespace CertificateGenerator.Tests.ViewModels;
 
@@ -30,6 +31,11 @@ public sealed class MainViewModelTests
         var fp = filePicker ?? new FakeFilePicker();
         var mb = messageBox ?? new FakeMessageBoxService();
 
+        var pdf = pdfGenerator ?? new FakePdfGenerator();
+        var zip = new FakeZipPacker();
+        var batchGen = new CertificateBatchGenerator(pdf, zip);
+        var generation = new GenerationViewModel(batchGen, mb);
+
         return new MainViewModel(
             resolver ?? new FakeTableReaderResolver(new FakeTableReader(EmptyTable())),
             storage ?? new FakeProjectStorage(),
@@ -38,9 +44,10 @@ public sealed class MainViewModelTests
             validator ?? new FakeValidator(),
             new TemplateViewModel(tmplStorage, fp, new FakeTemplateRenderer()),
             tmplStorage,
-            pdfGenerator ?? new FakePdfGenerator(),
+            pdf,
             fp,
-            mb);
+            mb,
+            generation);
     }
 
     private static MainViewModel CreateViewModelWithOverride(

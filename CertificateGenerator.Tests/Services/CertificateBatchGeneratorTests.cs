@@ -175,10 +175,7 @@ public sealed class CertificateBatchGeneratorTests
         };
 
         var progressCalls = new List<BatchProgress>();
-        var progress = new Progress<BatchProgress>(p =>
-        {
-            lock (progressCalls) { progressCalls.Add(p); }
-        });
+        var progress = new SyncProgress<BatchProgress>(progressCalls.Add);
 
         gen.GenerateAll(
             "template.png",
@@ -188,18 +185,22 @@ public sealed class CertificateBatchGeneratorTests
             @"C:\out\gramoty.zip",
             progress);
 
-        // Progress<T> может вызывать асинхронно — но с TestSynchronizationContext
-        // (или без него) обычно выполняет синхронно. Дадим чуть-чуть времени.
-        Thread.Sleep(50);
+        // 2 вызова в цикле (перед каждой строкой) + 1 финальный = 3.
+        Assert.Equal(3, progressCalls.Count);
 
-        lock (progressCalls)
-        {
-            // 2 вызова в цикле + 1 финальный = 3.
-            Assert.True(progressCalls.Count >= 3);
-            Assert.Equal(2, progressCalls[0].Processed);
-            Assert.Equal(2, progressCalls[0].Total);
-            Assert.Equal("Иванов", progressCalls[0].CurrentName);
-        }
+        // Первый вызов — перед обработкой строки 0.
+        Assert.Equal(0, progressCalls[0].Processed);
+        Assert.Equal(2, progressCalls[0].Total);
+        Assert.Equal("Иванов", progressCalls[0].CurrentName);
+
+        // Второй вызов — перед обработкой строки 1.
+        Assert.Equal(1, progressCalls[1].Processed);
+        Assert.Equal("Петров", progressCalls[1].CurrentName);
+
+        // Финальный — 100%.
+        Assert.Equal(2, progressCalls[2].Processed);
+        Assert.Equal(2, progressCalls[2].Total);
+        Assert.Equal(string.Empty, progressCalls[2].CurrentName);
     }
 
     [Fact]
@@ -209,15 +210,15 @@ public sealed class CertificateBatchGeneratorTests
         var zipPacker = new FakeZipPacker();
         var gen = new CertificateBatchGenerator(pdfGenerator, zipPacker);
 
-        // Много строк, чтобы отменить после первой.
+        // Много строк, чтобы отменить после нескольких.
         var rows = Enumerable.Range(0, 100)
             .Select(i => (IReadOnlyList<string>)new[] { $"Участник {i}" })
             .ToArray();
 
         var cts = new CancellationTokenSource();
-        var progress = new Progress<BatchProgress>(p =>
+        var progress = new SyncProgress<BatchProgress>(p =>
         {
-            // Отменяем после 3 обработанных.
+            // Отменяем, когда обработано 3 участника.
             if (p.Processed >= 3)
             {
                 cts.Cancel();
@@ -234,8 +235,13 @@ public sealed class CertificateBatchGeneratorTests
             cts.Token);
 
         Assert.True(report.WasCancelled);
+
+        // Обработано: 0, 1, 2 (три), затем отмена. На 4-й итерации — выход.
+        // Значит, результатов примерно 4 (0,1,2 + отмена перед 3-й или 4-й).
         Assert.True(report.TotalCount < 100);
-        Assert.NotNull(report.ZipPath);  // ZIP всё же создан — то, что успели.
+        Assert.True(report.TotalCount >= 3);
+
+        Assert.NotNull(report.ZipPath);  // ZIP создан — то, что успели.
     }
 
     [Fact]
@@ -257,5 +263,21 @@ public sealed class CertificateBatchGeneratorTests
                 Array.Empty<Field>(),
                 rows,
                 @"C:\out\gramoty.zip"));
+    }
+
+    /// <summary>
+    /// Синхронный IProgress: вызывает колбэк сразу, а не через SynchronizationContext.
+    /// Для тестов — чтобы не ждать асинхронного Progress&lt;T&gt;.
+    /// </summary>
+    private sealed class SyncProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+
+        public SyncProgress(Action<T> handler)
+        {
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        }
+
+        public void Report(T value) => _handler(value);
     }
 }
