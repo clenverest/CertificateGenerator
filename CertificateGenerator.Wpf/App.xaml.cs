@@ -8,6 +8,7 @@ using CertificateGenerator.Wpf.ViewModels;
 using CertificateGenerator.Infrastructure.Readers;
 using CertificateGenerator.Core.Validators;
 using CertificateGenerator.Infrastructure.Rendering;
+using CertificateGenerator.Infrastructure.Generators;
 
 namespace CertificateGenerator.Wpf;
 
@@ -20,6 +21,9 @@ public partial class App : Application
 
     public App()
     {
+        // Лицензия QuestPDF. Community — бесплатно для учебных и небольших проектов.
+        QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
         var services = new ServiceCollection();
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
@@ -37,6 +41,7 @@ public partial class App : Application
         services.AddSingleton<IRecentProjectsStore, JsonRecentProjectsStore>();
         services.AddSingleton<ITableReaderResolver, TableReaderResolver>();
         services.AddSingleton<ITemplateStorage, FileTemplateStorage>();
+        services.AddSingleton<IPdfGenerator, QuestPdfGenerator>();
 
         // Валидация.
         services.AddSingleton<IValidator>(ProjectValidator.CreateDefault());
