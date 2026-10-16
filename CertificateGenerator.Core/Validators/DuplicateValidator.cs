@@ -5,8 +5,12 @@ using CertificateGenerator.Core.Services;
 namespace CertificateGenerator.Core.Validators;
 
 /// <summary>
-/// Находит дубликаты значений в полях проекта.
-/// Статические поля и пустые значения не считаются дубликатами.
+/// Находит дубликаты значений в обязательных полях проекта.
+/// Проверяются только поля с <see cref="Field.IsRequired"/> = true —
+/// пользователь сам решает, какие поля должны быть уникальными
+/// (обычно это ФИО).
+/// Статические поля пропускаются: их значение одинаково по определению.
+/// Пустые значения не считаются дубликатами.
 /// </summary>
 public sealed class DuplicateValidator : IValidator
 {
@@ -29,7 +33,9 @@ public sealed class DuplicateValidator : IValidator
 
         foreach (var field in fields)
         {
-            if (field.Kind == FieldKind.Static)
+            // Проверяем только обязательные поля (кроме Static —
+            // у него значение одинаково по определению).
+            if (field.Kind == FieldKind.Static || !field.IsRequired)
             {
                 continue;
             }
@@ -96,7 +102,7 @@ public sealed class DuplicateValidator : IValidator
                 IssueSeverity.Warning,
                 rowIndex,
                 field.Name,
-                $"Значение поля \"{field.Name}\" повторяется."));
+                $"Значение поля \"{field.Name}\" повторяется: \"{value}\"."));
         }
     }
 

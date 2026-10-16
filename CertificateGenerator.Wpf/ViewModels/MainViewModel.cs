@@ -197,6 +197,12 @@ public sealed partial class MainViewModel : ObservableObject
                 GenerateAllCommand.NotifyCanExecuteChanged();
             }
         };
+
+        // Количество строк влияет на доступность массовой генерации.
+        Rows.CollectionChanged += (_, _) =>
+        {
+            GenerateAllCommand.NotifyCanExecuteChanged();
+        };
     }
 
     /// <summary>
@@ -268,6 +274,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void OnTemplateChanged(object? sender, TemplateInfo info)
     {
         GeneratePdfCommand.NotifyCanExecuteChanged();
+        GenerateAllCommand.NotifyCanExecuteChanged();
 
         if (CurrentProject is null || ProjectFolderPath is null)
         {
@@ -293,6 +300,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void OnPlacementsChanged(object? sender, EventArgs e)
     {
         GeneratePdfCommand.NotifyCanExecuteChanged();
+        GenerateAllCommand.NotifyCanExecuteChanged();
 
         if (CurrentProject is null || ProjectFolderPath is null)
         {
@@ -360,7 +368,10 @@ public sealed partial class MainViewModel : ObservableObject
             project.Name,
             project.CreatedAt,
             project.SourceFileName,
-            fields);
+            fields,
+            project.RowOverrides,
+            project.Template,
+            project.Placements);
     }
 
     // ---------------------------------------------------------------------
@@ -609,7 +620,9 @@ public sealed partial class MainViewModel : ObservableObject
             project.CreatedAt,
             project.SourceFileName,
             project.Fields,
-            rowOverrides);
+            rowOverrides,
+            project.Template,
+            project.Placements);
     }
 
     private void OnRowValueChanged(object? sender, EventArgs e)
@@ -1102,6 +1115,10 @@ public sealed partial class MainViewModel : ObservableObject
         RebuildRows();
         UpdateFieldPreviews();
         RunValidation();
+
+        // После загрузки/смены таблицы количество строк меняется —
+        // пересчитываем доступность команды массовой генерации.
+        GenerateAllCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnCurrentProjectChanged(Project? value)
@@ -1110,6 +1127,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ProjectName));
         ResetChangesCommand.NotifyCanExecuteChanged();
         GeneratePdfCommand.NotifyCanExecuteChanged();
+        GenerateAllCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnProjectFolderPathChanged(string? value)
