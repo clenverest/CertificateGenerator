@@ -28,7 +28,10 @@ public sealed class MainViewModelTests
             navigator ?? new FakeWindowNavigator(),
             fields ?? new FieldsViewModel(new FakeFieldEditDialogService()),
             validator ?? new FakeValidator(),
-            new TemplateViewModel(new FakeTemplateStorage(), new FakeFilePicker()));
+            new TemplateViewModel(
+                new FakeTemplateStorage(),
+                new FakeFilePicker(),
+                new FakeTemplateRenderer()));    
     }
 
     private static MainViewModel CreateViewModelWithOverride(
